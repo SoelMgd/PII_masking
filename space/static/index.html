@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔒 PII Masking Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .input-textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 15px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+
+        .input-textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .method-selection {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+        }
+
+        .method-option {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .method-radio {
+            display: none;
+        }
+
+        .method-label {
+            display: block;
+            padding: 15px 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+            background: #f9fafb;
+        }
+
+        .method-radio:checked + .method-label {
+            border-color: #4f46e5;
+            background: #4f46e5;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .method-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .method-desc {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .process-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+        }
+
+        .process-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+            color: #6b7280;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e7eb;
+            border-radius: 50%;
+            border-top-color: #4f46e5;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-section {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4f46e5;
+        }
+
+        .result-title {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .result-content {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4f46e5;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+
+        .pii-selection {
+            margin-bottom: 25px;
+        }
+
+        .pii-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+
+        .pii-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pii-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: #4f46e5;
+        }
+
+        .pii-label {
+            font-size: 0.9rem;
+            color: #374151;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .pii-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .pii-btn {
+            padding: 6px 12px;
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .pii-btn:hover {
+            background: #e5e7eb;
+        }
+
+        .pii-btn.primary {
+            background: #4f46e5;
+            color: white;
+            border-color: #4f46e5;
+        }
+
+        .pii-btn.primary:hover {
+            background: #4338ca;
+        }
+
+        .input-method-selection {
+            margin-bottom: 25px;
+        }
+
+        .input-tabs {
+            display: flex;
+            border-bottom: 2px solid #e5e7eb;
+            margin-bottom: 20px;
+        }
+
+        .input-tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .input-tab.active {
+            color: #4f46e5;
+            border-bottom-color: #4f46e5;
+        }
+
+        .input-tab:hover {
+            color: #4f46e5;
+        }
+
+        .input-content {
+            display: none;
+        }
+
+        .input-content.active {
+            display: block;
+        }
+
+        .dropzone {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            background: #f9fafb;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .dropzone.dragover {
+            border-color: #4f46e5;
+            background: #f0f9ff;
+        }
+
+        .dropzone-icon {
+            font-size: 48px;
+            color: #9ca3af;
+            margin-bottom: 16px;
+        }
+
+        .dropzone.dragover .dropzone-icon {
+            color: #4f46e5;
+        }
+
+        .dropzone-text {
+            color: #374151;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+
+        .dropzone-subtext {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .file-info {
+            display: none;
+            background: #f0f9ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 12px;
+        }
+
+        .file-info.show {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-icon {
+            color: #3b82f6;
+            font-size: 20px;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .file-size {
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .file-remove {
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .file-remove:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .error {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .method-selection {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 PII Masking Demo</h1>
+            <p>Detect and mask Personal Identifiable Information in your documents.</p>
+        </div>
+
+        <div class="content">
+            <form id="piiForm">
+                <div class="form-group input-method-selection">
+                    <label>Choose input method:</label>
+                    <div class="input-tabs">
+                        <button type="button" class="input-tab active" onclick="switchInputMethod('text')">
+                            Text Input
+                        </button>
+                        <button type="button" class="input-tab" onclick="switchInputMethod('pdf')">
+                            PDF Upload
+                        </button>
+                    </div>
+                    
+                    <div id="textInput" class="input-content active">
+                        <textarea 
+                            id="inputText" 
+                            class="input-textarea"
+                            placeholder="Enter text containing PII information...
+
+Example: Hi, my name is John Smith and my email is john.smith@company.com. Call me at 555-1234."
+                        ></textarea>
+                    </div>
+                    
+                    <div id="pdfInput" class="input-content">
+                        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+                            <div class="dropzone-icon">📄</div>
+                            <div class="dropzone-text">Drop your PDF here or click to browse</div>
+                            <div class="dropzone-subtext">Supports PDF files up to 10MB</div>
+                        </div>
+                        <input type="file" id="fileInput" accept=".pdf" style="display: none;">
+                        <div id="fileInfo" class="file-info">
+                            <div class="file-icon">📄</div>
+                            <div class="file-details">
+                                <div class="file-name" id="fileName"></div>
+                                <div class="file-size" id="fileSize"></div>
+                            </div>
+                            <button type="button" class="file-remove" onclick="removeFile()">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Select masking method:</label>
+                    <div class="method-selection">
+                        <div class="method-option">
+                            <input type="radio" id="mistral" name="method" value="mistral" class="method-radio" checked onchange="toggleMistralModelSelection()">
+                            <label for="mistral" class="method-label">
+                                <div class="method-title">Mistral AI</div>
+                                <div class="method-desc">High accuracy via API</div>
+                            </label>
+                        </div>
+                        <div class="method-option">
+                            <input type="radio" id="bert" name="method" value="bert" class="method-radio" onchange="toggleMistralModelSelection()">
+                            <label for="bert" class="method-label">
+                                <div class="method-title">BERT</div>
+                                <div class="method-desc">Fast local processing</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="mistralModelSelection">
+                    <label>Select Mistral model:</label>
+                    <div class="method-selection">
+                        <div class="method-option">
+                            <input type="radio" id="base" name="model" value="base" class="method-radio" checked>
+                            <label for="base" class="method-label">
+                                <div class="method-title">Base Model</div>
+                                <div class="method-desc">mistral-large-latest with detailed prompting</div>
+                            </label>
+                        </div>
+                        <div class="method-option">
+                            <input type="radio" id="finetuned" name="model" value="finetuned" class="method-radio">
+                            <label for="finetuned" class="method-label">
+                                <div class="method-title">Fine-tuned Model</div>
+                                <div class="method-desc">Specialized PII detection model</div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group pii-selection">
+                    <label>Select PII entities to mask:</label>
+                    <div class="pii-controls">
+                        <button type="button" class="pii-btn primary" onclick="selectAllPII()">Select All</button>
+                        <button type="button" class="pii-btn" onclick="selectNonePII()">Select None</button>
+                        <button type="button" class="pii-btn" onclick="selectCommonPII()">Select Common</button>
+                    </div>
+                    <div class="pii-grid" id="piiGrid">
+                        <!-- PII checkboxes will be generated here -->
+                    </div>
+                </div>
+
+                <button type="submit" class="process-btn" id="processBtn">
+                    Process Text
+                </button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                Processing your text...
+            </div>
+
+            <div class="result" id="result">
+                <div class="result-section">
+                    <div class="result-title">Masked Text</div>
+                    <div class="result-content" id="maskedText"></div>
+                </div>
+
+                <div class="result-section">
+                    <div class="result-title">Detected Entities</div>
+                    <div class="result-content" id="entities"></div>
+                </div>
+
+                <div class="metrics">
+                    <div class="metric">
+                        <div class="metric-value" id="processingTime">-</div>
+                        <div class="metric-label">Processing Time (s)</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="numEntities">-</div>
+                        <div class="metric-label">Entities Found</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="methodUsed">-</div>
+                        <div class="metric-label">Method Used</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-value" id="selectedEntities">-</div>
+                        <div class="metric-label">Selected Entities</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="error" id="error" style="display: none;">
+                <strong>Error:</strong> <span id="errorMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // PII entities list based on your data
+        const PII_ENTITIES = [
+            'PREFIX', 'FIRSTNAME', 'LASTNAME', 'MIDDLENAME', 'DATE', 'TIME', 'DOB', 'AGE',
+            'PHONEIMEI', 'PHONENUMBER', 'USERNAME', 'PASSWORD', 'GENDER', 'SEX', 'CITY', 'STATE',
+            'COUNTY', 'STREET', 'BUILDINGNUMBER', 'SECONDARYADDRESS', 'ZIPCODE', 'ORDINALDIRECTION',
+            'URL', 'IP', 'IPV4', 'IPV6', 'MAC', 'JOBAREA', 'JOBTYPE', 'JOBTITLE', 'EMAIL',
+            'COMPANYNAME', 'ACCOUNTNAME', 'ACCOUNTNUMBER', 'CURRENCYSYMBOL', 'CURRENCY', 
+            'CURRENCYNAME', 'CURRENCYCODE', 'AMOUNT', 'CREDITCARDISSUER', 'CREDITCARDNUMBER', 
+            'CREDITCARDCVV', 'IBAN', 'BIC', 'ETHEREUMADDRESS', 'BITCOINADDRESS', 'LITECOINADDRESS',
+            'VEHICLEVRM', 'VEHICLEVIN', 'PIN', 'MASKEDNUMBER', 'NEARBYGPSCOORDINATE', 'EYECOLOR', 
+            'HEIGHT', 'SSN', 'USERAGENT'
+        ];
+
+        // Common PII entities (most frequently used)
+        const COMMON_PII = [
+            'FIRSTNAME', 'LASTNAME', 'EMAIL', 'PHONENUMBER', 'DATE', 'SSN', 'CREDITCARDNUMBER',
+            'ADDRESS', 'CITY', 'STATE', 'ZIPCODE', 'DOB', 'AGE', 'IP'
+        ];
+
+        // Global variables
+        let selectedFile = null;
+        let currentInputMethod = 'text';
+
+        // Initialize PII selection on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializePIISelection();
+            initializeFileUpload();
+        });
+
+        function initializePIISelection() {
+            const piiGrid = document.getElementById('piiGrid');
+            piiGrid.innerHTML = '';
+
+            PII_ENTITIES.forEach(entity => {
+                const item = document.createElement('div');
+                item.className = 'pii-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `pii-${entity}`;
+                checkbox.value = entity;
+                checkbox.className = 'pii-checkbox';
+                
+                // Pre-select common PII entities
+                if (COMMON_PII.includes(entity)) {
+                    checkbox.checked = true;
+                }
+                
+                const label = document.createElement('label');
+                label.htmlFor = `pii-${entity}`;
+                label.className = 'pii-label';
+                label.textContent = entity;
+                
+                item.appendChild(checkbox);
+                item.appendChild(label);
+                piiGrid.appendChild(item);
+            });
+        }
+
+        function selectAllPII() {
+            const checkboxes = document.querySelectorAll('.pii-checkbox');
+            checkboxes.forEach(cb => cb.checked = true);
+        }
+
+        function selectNonePII() {
+            const checkboxes = document.querySelectorAll('.pii-checkbox');
+            checkboxes.forEach(cb => cb.checked = false);
+        }
+
+        function selectCommonPII() {
+            const checkboxes = document.querySelectorAll('.pii-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = COMMON_PII.includes(cb.value);
+            });
+        }
+
+        function getSelectedPIIEntities() {
+            const checkboxes = document.querySelectorAll('.pii-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function switchInputMethod(method) {
+            currentInputMethod = method;
+            
+            // Update tab appearance
+            document.querySelectorAll('.input-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update content visibility
+            document.querySelectorAll('.input-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(method + 'Input').classList.add('active');
+        }
+
+        function initializeFileUpload() {
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            
+            // Prevent default drag behaviors
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            // Highlight drop area when item is dragged over it
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, unhighlight, false);
+            });
+            
+            // Handle dropped files
+            dropzone.addEventListener('drop', handleDrop, false);
+            
+            // Handle file input change
+            fileInput.addEventListener('change', function(e) {
+                handleFiles(e.target.files);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            function highlight(e) {
+                dropzone.classList.add('dragover');
+            }
+            
+            function unhighlight(e) {
+                dropzone.classList.remove('dragover');
+            }
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }
+            
+            function handleFiles(files) {
+                if (files.length > 0) {
+                    const file = files[0];
+                    
+                    // Validate file type
+                    if (!file.name.toLowerCase().endsWith('.pdf')) {
+                        showError('Please select a PDF file.');
+                        return;
+                    }
+                    
+                    // Validate file size (10MB limit)
+                    const maxSize = 10 * 1024 * 1024; // 10MB
+                    if (file.size > maxSize) {
+                        showError('File size must be less than 10MB.');
+                        return;
+                    }
+                    
+                    selectedFile = file;
+                    showFileInfo(file);
+                }
+            }
+        }
+
+        function showFileInfo(file) {
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileInfo').classList.add('show');
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            document.getElementById('fileInfo').classList.remove('show');
+            document.getElementById('fileInput').value = '';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        document.getElementById('piiForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const method = document.querySelector('input[name="method"]:checked').value;
+            const model = document.querySelector('input[name="model"]:checked').value;
+            const selectedPIIEntities = getSelectedPIIEntities();
+            
+            if (selectedPIIEntities.length === 0) {
+                showError('Please select at least one PII entity to mask.');
+                return;
+            }
+            
+            // Show loading state
+            setLoading(true);
+            hideError();
+            hideResult();
+            
+            try {
+                let response;
+                
+                if (currentInputMethod === 'text') {
+                    // Text input processing
+                    const text = document.getElementById('inputText').value.trim();
+                    
+                    if (!text) {
+                        showError('Please enter some text to analyze.');
+                        setLoading(false);
+                        return;
+                    }
+                    
+                    response = await fetch('/predict', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            text: text,
+                            method: method,
+                            model: model,
+                            pii_entities: selectedPIIEntities
+                        })
+                    });
+                    
+                } else if (currentInputMethod === 'pdf') {
+                    // PDF processing
+                    if (!selectedFile) {
+                        showError('Please select a PDF file to analyze.');
+                        setLoading(false);
+                        return;
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append('file', selectedFile);
+                    formData.append('method', method);
+                    formData.append('model', model);
+                    formData.append('pii_entities', JSON.stringify(selectedPIIEntities));
+                    
+                    response = await fetch('/predict-pdf', {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showResult(result);
+                } else {
+                    showError(result.detail || 'An error occurred during processing.');
+                }
+                
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                setLoading(false);
+            }
+        });
+        
+        function setLoading(loading) {
+            const loadingEl = document.getElementById('loading');
+            const processBtn = document.getElementById('processBtn');
+            
+            if (loading) {
+                loadingEl.style.display = 'block';
+                processBtn.disabled = true;
+                processBtn.textContent = 'Processing...';
+            } else {
+                loadingEl.style.display = 'none';
+                processBtn.disabled = false;
+                processBtn.textContent = 'Process Text';
+            }
+        }
+        
+        function showResult(result) {
+            document.getElementById('maskedText').textContent = result.masked_text;
+            document.getElementById('entities').textContent = JSON.stringify(result.entities, null, 2);
+            document.getElementById('processingTime').textContent = result.processing_time.toFixed(3);
+            document.getElementById('numEntities').textContent = result.num_entities;
+            document.getElementById('methodUsed').textContent = result.method_used.toUpperCase();
+            document.getElementById('selectedEntities').textContent = result.selected_entities ? result.selected_entities.length : 0;
+            
+            document.getElementById('result').style.display = 'block';
+        }
+        
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+        
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('error').style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+        
+        function toggleMistralModelSelection() {
+            const mistralSelected = document.getElementById('mistral').checked;
+            const mistralModelSelection = document.getElementById('mistralModelSelection');
+            
+            if (mistralSelected) {
+                mistralModelSelection.style.display = 'block';
+            } else {
+                mistralModelSelection.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html> 
