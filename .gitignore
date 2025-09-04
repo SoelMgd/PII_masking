@@ -57,7 +57,7 @@ checkpoints/
 *.pt
 *.pth
 
-# Data files (keep small samples, ignore large datasets)
+# Data files
 data/*.jsonl
 data/*.csv
 data/*.parquet
@@ -71,9 +71,8 @@ logs/
 wandb/
 mlruns/
 
-# Jupyter
+# Notebooks
 .ipynb_checkpoints/
-*.ipynb
 
 # Cache
 .cache/
