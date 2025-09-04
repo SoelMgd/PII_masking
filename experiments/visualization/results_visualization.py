@@ -177,6 +177,88 @@ def compare_models(json_file_paths, save_path="experiments/images"):
     print(f"Model comparison plot saved to: {save_file_path}")
     plt.show()
 
+def bert_training_metrics(save_path="experiments/images"):
+    """
+    Plot BERT training metrics: Training Loss and F1-Score over training steps.
+    Uses data extracted from the BERT fine-tuning notebook.
+    
+    Args:
+        save_path (str): Directory to save the plot image
+    """
+    # Training data extracted from BERT fine-tuning notebook
+    # Steps where evaluation was performed
+    steps = [500, 1000, 1500, 2000, 2500, 3000]
+    
+    # Training loss at each step
+    training_loss = [0.3731, 0.1520, 0.1136, 0.0964, 0.0910, 0.0809]
+    
+    # Validation loss at each step
+    validation_loss = [0.3026, 0.1337, 0.1043, 0.0894, 0.0832, 0.0813]
+    
+    # F1-Score at each step (token-level)
+    f1_scores = [0.5894, 0.8402, 0.8866, 0.9035, 0.9093, 0.9131]
+    
+    # Precision at each step
+    precision = [0.6672, 0.8710, 0.8957, 0.9098, 0.9182, 0.9184]
+    
+    # Recall at each step
+    recall = [0.6076, 0.8446, 0.8950, 0.9131, 0.9137, 0.9191]
+    
+    # Create the plot with dual y-axes
+    fig, ax1 = plt.subplots(figsize=(12, 8))
+    
+    # Plot loss on the left y-axis
+    color1 = 'tab:red'
+    ax1.set_xlabel('Training Steps', fontsize=12)
+    ax1.set_ylabel('Loss', color=color1, fontsize=12)
+    line1 = ax1.plot(steps, training_loss, color=color1, marker='o', linewidth=2, 
+                     label='Training Loss', markersize=6)
+    line2 = ax1.plot(steps, validation_loss, color='tab:orange', marker='s', linewidth=2, 
+                     label='Validation Loss', markersize=6)
+    ax1.tick_params(axis='y', labelcolor=color1)
+    ax1.grid(True, alpha=0.3)
+    
+    # Create second y-axis for F1-score
+    ax2 = ax1.twinx()
+    color2 = 'tab:blue'
+    ax2.set_ylabel('F1-Score', color=color2, fontsize=12)
+    line3 = ax2.plot(steps, f1_scores, color=color2, marker='^', linewidth=2, 
+                     label='F1-Score (Token-level)', markersize=6)
+    ax2.tick_params(axis='y', labelcolor=color2)
+    ax2.set_ylim(0, 1.0)
+    
+    # Add title
+    plt.title('BERT Fine-tuning: Training Progress\n(DistilBERT on PII Token Classification)', 
+              fontsize=14, fontweight='bold', pad=20)
+    
+    # Add value annotations for key points
+    for i, (step, loss, f1) in enumerate(zip(steps, training_loss, f1_scores)):
+        if i % 2 == 0:  # Annotate every other point to avoid clutter
+            ax1.annotate(f'{loss:.3f}', (step, loss), textcoords="offset points", 
+                        xytext=(0,10), ha='center', fontsize=9, color=color1)
+            ax2.annotate(f'{f1:.3f}', (step, f1), textcoords="offset points", 
+                        xytext=(0,-15), ha='center', fontsize=9, color=color2)
+    
+    # Combine legends from both axes
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='center right', framealpha=0.9)
+    
+    # Add text box with final metrics
+    textstr = f'Final Metrics (Step 3000):\n• F1-Score: {f1_scores[-1]:.3f}\n• Precision: {precision[-1]:.3f}\n• Recall: {recall[-1]:.3f}\n• Val Loss: {validation_loss[-1]:.4f}'
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.8)
+    ax1.text(0.02, 0.98, textstr, transform=ax1.transAxes, fontsize=10,
+            verticalalignment='top', bbox=props)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    os.makedirs(save_path, exist_ok=True)
+    save_file_path = os.path.join(save_path, "bert_training_loss.png")
+    plt.savefig(save_file_path, dpi=300, bbox_inches='tight')
+    print(f"BERT training metrics plot saved to: {save_file_path}")
+    plt.show()
+
 def main():
     """
     Main function to execute the visualization functions for the specified models.
@@ -236,6 +318,16 @@ def main():
         compare_models(existing_files)
     except Exception as e:
         print(f"Error generating model comparison: {e}")
+    
+    print("\n" + "="*50)
+    print("Generating BERT training metrics plot...")
+    print("="*50)
+    
+    # Generate BERT training metrics plot
+    try:
+        bert_training_metrics()
+    except Exception as e:
+        print(f"Error generating BERT training metrics: {e}")
     
     print("\nVisualization complete!")
 
