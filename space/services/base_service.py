@@ -6,6 +6,7 @@ This module defines the common interface that all PII inference services should 
 """
 
 import sys
+import asyncio
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -20,8 +21,8 @@ class BasePIIInferenceService(ABC):
     Abstract base class for PII inference services.
     
     This ensures a consistent interface across different PII detection approaches:
-    - Mistral API-based services (prompting, fine-tuning)
-    - BERT token classification services
+    - Mistral API-based services (prompting, fine-tuning) - naturally async
+    - BERT token classification services - naturally sync, wrapped in async
     - Other future implementations
     """
     
@@ -45,10 +46,11 @@ class BasePIIInferenceService(ABC):
         """
         pass
     
-    @abstractmethod
-    async def predict(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
+    def predict_sync(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
         """
-        Predict PII entities for a single text.
+        Synchronous prediction method (for CPU-bound models like BERT).
+        Default implementation raises NotImplementedError.
+        Override this for sync models (BERT, local models).
         
         Args:
             text: Input text to analyze
@@ -57,15 +59,56 @@ class BasePIIInferenceService(ABC):
         Returns:
             PIIPrediction object with entities, spans, and masked text
         """
-        pass
+        raise NotImplementedError("This service doesn't support synchronous prediction")
+    
+    async def predict_async_native(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
+        """
+        Native asynchronous prediction method (for I/O-bound models like Mistral API).
+        Default implementation raises NotImplementedError.
+        Override this for truly async models (API calls, network I/O).
+        
+        Args:
+            text: Input text to analyze
+            pii_entities: List of PII entity types to mask (if None, mask all detected entities)
+            
+        Returns:
+            PIIPrediction object with entities, spans, and masked text
+        """
+        raise NotImplementedError("This service doesn't support native async prediction")
+    
+    async def predict(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
+        """
+        Unified async prediction method that routes to the appropriate implementation.
+        
+        - For sync models (BERT): calls predict_sync in a thread pool
+        - For async models (Mistral): calls predict_async_native directly
+        
+        Args:
+            text: Input text to analyze
+            pii_entities: List of PII entity types to mask (if None, mask all detected entities)
+            
+        Returns:
+            PIIPrediction object with entities, spans, and masked text
+        """
+        # Try native async first (for API-based models)
+        try:
+            return await self.predict_async_native(text, pii_entities)
+        except NotImplementedError:
+            pass
+        
+        # Fall back to sync in thread pool (for local models)
+        try:
+            return await asyncio.to_thread(self.predict_sync, text, pii_entities)
+        except NotImplementedError:
+            raise NotImplementedError("Service must implement either predict_sync or predict_async_native")
     
     @abstractmethod
     def get_service_info(self) -> Dict[str, Any]:
         """
-        Get service information for monitoring and debugging.
+        Get service information for health checks and debugging.
         
         Returns:
-            Dictionary with service metadata (name, model, status, etc.)
+            Dictionary with service information
         """
         pass
     

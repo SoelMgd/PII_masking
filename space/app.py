@@ -49,18 +49,18 @@ async def lifespan(app: FastAPI):
     global mistral_base_service, mistral_finetuned_service, bert_service, ocr_service
     
     # Startup
-    logger.info("🚀 Starting PII Masking Demo application...")
+    logger.info("Starting PII Masking Demo application...")
     
     try:
         # Initialize base Mistral service
         logger.info("Initializing base Mistral service...")
         mistral_base_service = await create_mistral_service(model_name=MODELS["base"])
-        logger.info("✅ Base Mistral service initialized successfully")
+        logger.info("Base Mistral service initialized successfully")
         
         # Initialize fine-tuned Mistral service
         logger.info("Initializing fine-tuned Mistral service...")
         mistral_finetuned_service = await create_mistral_service(model_name=MODELS["finetuned"])
-        logger.info("✅ Fine-tuned Mistral service initialized successfully")
+        logger.info("Fine-tuned Mistral service initialized successfully")
         
     except Exception as e:
         logger.error(f"Failed to initialize Mistral services: {e}")
@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
         # Initialize BERT service
         logger.info("Initializing BERT service...")
         bert_service = await create_bert_service(model_path=BERT_MODEL_PATH)
-        logger.info("✅ BERT service initialized successfully")
+        logger.info("BERT service initialized successfully")
         
     except Exception as e:
         logger.error(f"Failed to initialize BERT service: {e}")
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
         # Initialize OCR service
         logger.info("Initializing OCR service...")
         ocr_service = await create_ocr_service()
-        logger.info("✅ OCR service initialized successfully")
+        logger.info("OCR service initialized successfully")
         
     except Exception as e:
         logger.error(f"Failed to initialize OCR service: {e}")
@@ -89,7 +89,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("🔄 Shutting down application...")
+    logger.info("Shutting down application...")
 
 # Create FastAPI app
 app = FastAPI(
@@ -175,7 +175,7 @@ async def root():
                 
                 <textarea id="inputText" placeholder="Enter your text here... (e.g., Hi, my name is John Smith and my email is john.smith@company.com)"></textarea>
                 <br>
-                <button onclick="processText()">🚀 Process Text</button>
+                <button onclick="processText()">Process Text</button>
                 
                 <div id="result" class="result" style="display:none;">
                     <h3>Results:</h3>
@@ -265,7 +265,7 @@ async def predict(request: PredictionRequest):
         # Count total entities
         num_entities = sum(len(entities) for entities in prediction.entities.values())
         
-        logger.info(f"✅ Prediction completed in {processing_time:.3f}s - found {num_entities} entities")
+        logger.info(f"Prediction completed in {processing_time:.3f}s - found {num_entities} entities")
         
         return PredictionResponse(
             masked_text=prediction.masked_text,
@@ -277,7 +277,7 @@ async def predict(request: PredictionRequest):
         )
         
     except Exception as e:
-        logger.error(f"❌ Prediction failed: {e}")
+        logger.error(f"Prediction failed: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Prediction failed: {str(e)}"
@@ -325,10 +325,10 @@ async def predict_pdf(
         
         # Read PDF content
         pdf_content = await file.read()
-        logger.info(f"📄 Received PDF file: {file.filename} ({len(pdf_content)} bytes)")
+        logger.info(f"Received PDF file: {file.filename} ({len(pdf_content)} bytes)")
         
         # Extract text using OCR
-        logger.info("🔍 Extracting text from PDF using Mistral OCR...")
+        logger.info("Extracting text from PDF using Mistral OCR...")
         extracted_text = await ocr_service.extract_text_from_pdf(pdf_content)
         
         if not extracted_text or len(extracted_text.strip()) < 10:
@@ -337,7 +337,7 @@ async def predict_pdf(
                 detail="Could not extract sufficient text from PDF"
             )
         
-        logger.info(f"📝 Extracted {len(extracted_text)} characters from PDF")
+        logger.info(f"Extracted {len(extracted_text)} characters from PDF")
         
         # Now process the extracted text with the selected method
         if method == "mistral":
@@ -362,7 +362,7 @@ async def predict_pdf(
         # Count total entities
         num_entities = sum(len(entities) for entities in prediction.entities.values())
         
-        logger.info(f"✅ PDF processing completed in {processing_time:.3f}s - found {num_entities} entities")
+        logger.info(f"PDF processing completed in {processing_time:.3f}s - found {num_entities} entities")
         
         return PredictionResponse(
             masked_text=prediction.masked_text,
@@ -376,7 +376,7 @@ async def predict_pdf(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ PDF processing failed: {e}")
+        logger.error(f"PDF processing failed: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"PDF processing failed: {str(e)}"

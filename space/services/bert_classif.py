@@ -96,16 +96,10 @@ class BERTInferenceService(BasePIIInferenceService):
             logger.error(f"❌ Failed to initialize BERT model: {e}")
             return False
     
-    async def predict(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
+    def predict_sync(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
         """
-        Predict PII entities for a single text.
-        
-        Args:
-            text: Input text to analyze
-            pii_entities: List of PII entity types to mask (if None, mask all detected entities)
-            
-        Returns:
-            PIIPrediction object with entities, spans, and masked text
+        Synchronous prediction method for BERT (CPU-bound).
+        This is the natural way to call PyTorch/Transformers models.
         """
         if not self.is_initialized:
             raise RuntimeError("Service not initialized. Call initialize() first.")

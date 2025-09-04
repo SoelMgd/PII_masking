@@ -313,16 +313,10 @@ JSON Output:"""
         logger.debug(f"🔗 Merged {len(all_spans)} entities from {len(chunk_results)} chunks")
         return final_prediction
 
-    async def predict(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
+    async def predict_async_native(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
         """
-        Predict PII entities for a single text, using batch processing for long texts.
-        
-        Args:
-            text: Input text to analyze
-            pii_entities: List of PII entity types to mask (if None, mask all detected entities)
-            
-        Returns:
-            PIIPrediction object with entities, spans, and masked text
+        Native async prediction method for Mistral (I/O-bound API calls).
+        This is the natural way to call external APIs.
         """
         if not self.is_initialized:
             raise RuntimeError("Service not initialized. Call initialize() first.")
@@ -330,17 +324,14 @@ JSON Output:"""
         if not text or not text.strip():
             return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
         
-        # Check if we should use batch processing
-        should_batch = (
-            self.enable_batching and 
-            len(text) > self.config['batch_threshold']
-        )
-        
-        if not should_batch:
-            # Use regular single request
+        # For very long texts, use batch processing to avoid API limits
+        if self.enable_batching and len(text) > self.config['batch_threshold']:
+            return await self._predict_batch(text, pii_entities)
+        else:
             return await self._predict_single(text, pii_entities)
-        
-        # Use batch processing for long text
+
+    async def _predict_batch(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
+        """Handle batch processing for long texts."""
         logger.info(f"📦 Using batch processing for long text ({len(text)} chars)")
         
         try:
@@ -383,7 +374,7 @@ JSON Output:"""
             # Fallback to single request
             logger.info("🔄 Falling back to single request processing")
             return await self._predict_single(text, pii_entities)
-    
+
     async def _predict_single(self, text: str, pii_entities: List[str] = None) -> PIIPrediction:
         """
         Predict PII entities using single API request (original method).
