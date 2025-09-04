@@ -259,19 +259,19 @@ class BERTTokenClassificationModel:
             masked_text = self._reconstruct_masked_text(text, spans)
             
             # Create PIIPrediction object
-                prediction = PIIPrediction(
-                    entities=entities_dict,
-                    spans=spans,
-                    masked_text=masked_text,
-                    original_text=text
-                )
+            prediction = PIIPrediction(
+                entities=entities_dict,
+                spans=spans,
+                masked_text=masked_text,
+                original_text=text
+            )
             
             return prediction
             
         except Exception as e:
             logger.error(f"Error during prediction: {e}")
             # Return empty prediction on error
-                return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
+            return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
     
     def _convert_predictions_to_entities(self, text: str, inputs: Dict, predicted_ids: List[int]) -> tuple:
         """Convert token-level predictions to entity dictionary and spans."""
@@ -321,12 +321,12 @@ class BERTTokenClassificationModel:
                 entities_dict[entity_type].append(entity_text)
             
             # Add to spans list
-                final_spans.append(EntitySpan(
-                    entity_type=entity_type,
-                    start=span_info['start'],
-                    end=span_info['end'],
-                    text=entity_text
-                ))
+            final_spans.append(EntitySpan(
+                entity_type=entity_type,
+                start=span_info['start'],
+                end=span_info['end'],
+                text=entity_text
+            ))
         
         return entities_dict, final_spans
     
@@ -484,8 +484,8 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     evaluation_result = evaluator.evaluate_dataset(
         examples=pii_examples,
         predictions=predictions,
-        experiment_name="bert_token_classification_entity_eval",
-        model_name="distilbert-base-uncased-finetuned",
+        experiment_name="bert_classic_token_classification_entity_eval",
+        model_name="bert-base-uncased-finetuned",
         config={
             "model_path": model_path,
             "data_path": data_path,
@@ -500,7 +500,7 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     # Print results
     logger.info("Evaluation completed!")
     print("\n" + "="*80)
-    print("BERT TOKEN CLASSIFICATION - ENTITY-LEVEL EVALUATION RESULTS")
+    print("BERT CLASSIC TOKEN CLASSIFICATION - ENTITY-LEVEL EVALUATION RESULTS")
     print("="*80)
     print(f"Total examples: {evaluation_result.total_examples}")
     print(f"Successful predictions: {evaluation_result.successful_predictions}")
@@ -523,7 +523,7 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     
     # Save results
     os.makedirs(results_path, exist_ok=True)
-    results_file = os.path.join(results_path, "bert_token_classification_entity_eval.json")
+    results_file = os.path.join(results_path, "bert_classic_token_classification_entity_eval.json")
     
     with open(results_file, 'w', encoding='utf-8') as f:
         json.dump(evaluation_result.to_dict(), f, indent=2, ensure_ascii=False)
@@ -536,11 +536,11 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
 def main():
     """Main evaluation function."""
     
-    print("BERT PII Token Classification - Entity-Level Evaluation")
+    print("BERT Classic PII Token Classification - Entity-Level Evaluation")
     print("="*60)
     
     # Configuration
-    model_path = "/Users/twin/Documents/pii-masking-200k/models/bert_token_classif"
+    model_path = "/Users/twin/Documents/pii-masking-200k/models/bert_classic_token_classif"
     data_path = "/Users/twin/Documents/pii-masking-200k/data/processed_data_bert"
     results_path = "/Users/twin/Documents/pii-masking-200k/results"
     
@@ -561,7 +561,7 @@ def main():
     # Run evaluation
     try:
         evaluate_bert_model(model_path, data_path, results_path)
-        except Exception as e:
+    except Exception as e:
         logger.error(f"Evaluation failed: {e}")
         raise
 

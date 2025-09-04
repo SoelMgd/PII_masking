@@ -392,81 +392,68 @@ Fine-tuning achieves \textbf{+4.5\% F1-score} improvement over few-shot promptin
 \end{columns}
 \end{frame}
 
-\begin{frame}{BERT Results \& Cross-Method Comparison}
+\begin{frame}{BERT Training Results: Two Models Compared}
 \begin{columns}
-\begin{column}{0.6\textwidth}
+\begin{column}{0.5\textwidth}
 \begin{center}
-\includegraphics[width=\textwidth]{images/bert_training_loss.png}
-\caption{BERT Training: Token-level Loss}
+\includegraphics[width=\textwidth]{images/bert_distilled_training_loss.png}
+\caption{DistilBERT Training}
 \end{center}
 
-\textbf{Training Performance}
+\textbf{DistilBERT Performance}
 \begin{itemize}
-\item Token-level F1-score: \textbf{90\%}
-\item Classification loss converges well
-\item Strong token-by-token predictions
+\item Token-level F1: \textbf{91.3\%}
+\item Parameters: 66M
+\item Training time: 3 epochs
 \end{itemize}
 \end{column}
-\begin{column}{0.4\textwidth}
-\textbf{Entity-Level Challenge}
-\begin{itemize}
-\item Token misalignment within entities
-\item Boundary detection errors
-\item Subword tokenization issues
-\end{itemize}
+\begin{column}{0.5\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{images/bert_classic_training_loss.png}
+\caption{BERT Classic Training}
+\end{center}
 
-\vspace{0.3cm}
-\begin{alertblock}{Reality Check}
-\textbf{Token-level}: 90\% F1\\
-\textbf{Entity-level}: 61\% F1\\
-\\
-Token errors compound into entity-level mistakes
-\end{alertblock}
+\textbf{BERT Classic Performance}
+\begin{itemize}
+\item Token-level F1: \textbf{93.5\%}
+\item Parameters: 110M
+\item Training time: 4 epochs
+\end{itemize}
 \end{column}
 \end{columns}
 
 \vspace{0.3cm}
-\begin{table}[h]
-\centering
-\scriptsize
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Method} & \textbf{Entity F1} & \textbf{Precision} & \textbf{Recall} & \textbf{Inference Time} \\
-\midrule
-BERT-base (Entity-level) & 0.610 & 0.642 & 0.580 & 89ms \\
-Fine-tuned Mistral-8B & 0.892 & 0.901 & 0.883 & 2.3s \\
-Mistral-large (Few-shot) & 0.847 & 0.889 & 0.808 & 3.1s \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{alertblock}{Training Observation}
+Both BERT models achieve excellent token-level performance (>91\%), but entity-level evaluation reveals different results...
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Token vs Entity-Level Evaluation: The Gap}
+\begin{frame}{Entity-Level Reality Check: The Performance Gap}
 \begin{columns}
 \begin{column}{0.5\textwidth}
 \textbf{Token-Level Classification}
 \begin{itemize}
 \item Each token gets a BIO label
-\item High accuracy: 90\% F1-score
-\item Looks good during training
+\item High accuracy: 91-93\% F1-score
+\item Looks excellent during training
 \item Standard NER evaluation
 \end{itemize}
 
 \vspace{0.3cm}
-\textbf{Example: Token Success}
-\begin{center}
-\texttt{John | Smith | lives | at}\\
-\texttt{B-NAME | I-NAME | O | O}\\
-\textcolor{green}{✓ All tokens correct}
-\end{center}
+\textbf{Entity-Level Results}
+\begin{itemize}
+\item \textbf{BERT Classic}: 71.4\% F1
+\item \textbf{DistilBERT}: 61\% F1
+\item Gap: 20-30\% performance drop!
+\end{itemize}
 \end{column}
 \begin{column}{0.5\textwidth}
-\textbf{Entity-Level Evaluation}
+\textbf{Why the Gap Exists}
 \begin{itemize}
-\item Entire entity must be perfect
-\item Exact boundary matching required
-\item Reality check: 61\% F1-score
-\item Business-relevant metric
+\item Token misalignment within entities
+\item Boundary detection errors
+\item Subword tokenization issues
+\item Single token error = entire entity failed
 \end{itemize}
 
 \vspace{0.3cm}
@@ -479,9 +466,35 @@ Mistral-large (Few-shot) & 0.847 & 0.889 & 0.808 & 3.1s \\
 \end{column}
 \end{columns}
 
-\vspace{0.5cm}
+\vspace{0.3cm}
 \begin{alertblock}{Key Insight}
-\textbf{Token-level metrics can be misleading!} A single token error within an entity makes the entire entity prediction wrong. This is why LLM approaches with JSON output perform better for real-world PII masking.
+\textbf{Token-level metrics can be misleading!} BERT Classic achieves 71.4\% entity-level F1 vs 93.5\% token-level, showing why LLM approaches with JSON output perform better for real-world PII masking.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Complete Performance Comparison: All Methods}
+\begin{center}
+\includegraphics[width=0.9\textwidth]{images/bert_mistral_entity_comparison.png}
+\end{center}
+
+\vspace{0.3cm}
+\begin{table}[h]
+\centering
+\scriptsize
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Method} & \textbf{Entity F1} & \textbf{Precision} & \textbf{Recall} & \textbf{Inference Time} \\
+\midrule
+Mistral Fine-tuned & \textbf{0.892} & \textbf{0.901} & 0.883 & 2.3s \\
+BERT Classic & 0.714 & 0.665 & \textbf{0.770} & 89ms \\
+Mistral Large (Few-shot) & 0.647 & 0.689 & 0.608 & 3.1s \\
+DistilBERT & 0.610 & 0.642 & 0.580 & 45ms \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{alertblock}{Key Findings}
+\textbf{Both BERT Classic and Mistral Fine-tuned outperform Mistral Large Few-shot}, but Mistral Fine-tuned remains superior for entity-level accuracy. BERT Classic offers the best speed/accuracy trade-off.
 \end{alertblock}
 \end{frame}
 
@@ -552,7 +565,7 @@ Mistral-large API & 3.1s & 12.4s & \$80.00 \\
 \end{table}
 
 \begin{alertblock}{Deployment Recommendation}
-\textbf{LLM approaches dominate} for entity-level accuracy. BERT offers speed but with significant accuracy trade-offs (61\% vs 89\% F1).
+\textbf{Mistral Fine-tuned leads in accuracy (89.2\%)} but BERT Classic provides excellent speed/accuracy trade-off (71.4\% F1, 25x faster). Both outperform Mistral Large Few-shot (64.7\%).
 \end{alertblock}
 \end{frame}
 
@@ -594,18 +607,19 @@ Mistral-large API & 3.1s & 12.4s & \$80.00 \\
 \begin{column}{0.5\textwidth}
 \textbf{Performance Summary}
 \begin{enumerate}
-\item \textbf{Fine-tuned Mistral}: Highest accuracy (0.892 F1)
-\item \textbf{Few-shot Prompting}: Excellent baseline (0.847 F1)
-\item \textbf{BERT Token Classification}: Fast but limited (0.61 F1)
-\item \textbf{Zero-shot}: Quick prototyping, lower accuracy
+\item \textbf{Mistral Fine-tuned}: Highest accuracy (89.2\% F1)
+\item \textbf{BERT Classic}: Strong performance (71.4\% F1), 25x faster
+\item \textbf{Mistral Large Few-shot}: Good baseline (64.7\% F1)
+\item \textbf{DistilBERT}: Fastest but limited (61\% F1)
 \end{enumerate}
 
 \vspace{0.3cm}
 \textbf{Business Recommendations}
 \begin{itemize}
-\item \textbf{Maximum accuracy}: Fine-tuned Mistral
-\item \textbf{Rapid deployment}: Few-shot prompting
-\item \textbf{Cost-sensitive}: BERT (with accuracy trade-offs)
+\item \textbf{Maximum accuracy}: Mistral Fine-tuned
+\item \textbf{Best speed/accuracy}: BERT Classic fine-tuned
+\item \textbf{Rapid deployment}: Mistral Few-shot prompting
+\item \textbf{High-volume/cost-sensitive}: DistilBERT (with trade-offs)
 \end{itemize}
 \end{column}
 \begin{column}{0.5\textwidth}
