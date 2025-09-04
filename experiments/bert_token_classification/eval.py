@@ -23,27 +23,24 @@ import logging
 import time
 from dataclasses import asdict
 
-# Suppress warnings for cleaner output
+
 import warnings
 warnings.filterwarnings("ignore", message=".*FutureWarning.*")
 
-# Transformers imports
 from transformers import (
     AutoTokenizer, 
     AutoModelForTokenClassification,
 )
 
-# Set up logging
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-# Import our evaluation classes
 try:
     from pii_masking.text_processing import PIIPrediction, EntitySpan
     from pii_masking.custom_evaluator import CustomPIIEvaluator
@@ -63,17 +60,14 @@ def load_processed_data(data_path: str) -> Tuple[List[Dict], Dict[str, int], Dic
     Returns:
         Tuple of (examples, label2id, id2label)
     """
-    # Load processed examples
     with open(f"{data_path}/processed_examples.json", 'r', encoding='utf-8') as f:
         examples = json.load(f)
     
-    # Load label mappings
     with open(f"{data_path}/label_mappings.json", 'r', encoding='utf-8') as f:
         mappings = json.load(f)
     
     label2id = mappings['label2id']
     id2label = mappings['id2label']
-    # Convert string keys to int for id2label
     id2label = {int(k): v for k, v in id2label.items()}
     
     logger.info(f"Loaded {len(examples)} examples")
@@ -110,55 +104,46 @@ def convert_bert_example_to_pii_example(bert_example: Dict) -> PIIExample:
     Returns:
         PIIExample object
     """
-    # Extract span labels from token-level labels
     span_labels = []
     tokens = bert_example['tokens']
     labels = bert_example['labels']
     token_spans = bert_example['token_spans']
     original_text = bert_example['original_text']
     
-    # Convert token-level labels to span labels
     current_entity = None
     current_start = None
     
     for i, (token, label, (start, end)) in enumerate(zip(tokens, labels, token_spans)):
-        # Skip special tokens
         if token in ['[CLS]', '[SEP]', '[PAD]']:
             continue
             
         if label != 'O':
             if current_entity is None:
-                # Start new entity
                 current_entity = label
                 current_start = start
             elif current_entity == label:
-                # Continue current entity
                 pass
             else:
-                # End previous entity and start new one
                 if current_start is not None:
                     span_labels.append([current_start, token_spans[i-1][1], current_entity])
                 current_entity = label
                 current_start = start
         else:
-            # End current entity if exists
             if current_entity is not None:
                 span_labels.append([current_start, token_spans[i-1][1], current_entity])
                 current_entity = None
                 current_start = None
     
-    # Handle entity at end of sequence
     if current_entity is not None and current_start is not None:
-        # Find the last non-special token
+       
         last_span_idx = len(token_spans) - 1
         while last_span_idx >= 0 and tokens[last_span_idx] in ['[CLS]', '[SEP]', '[PAD]']:
             last_span_idx -= 1
         if last_span_idx >= 0:
             span_labels.append([current_start, token_spans[last_span_idx][1], current_entity])
     
-    # Create masked text (simple approach)
     masked_text = original_text
-    for start, end, label in reversed(span_labels):  # Reverse to maintain positions
+    for start, end, label in reversed(span_labels):
         entity_text = original_text[start:end]
         placeholder = f"[{label}]"
         masked_text = masked_text[:start] + placeholder + masked_text[end:]
@@ -184,21 +169,19 @@ class BERTTokenClassificationModel:
         self.model = None
         self.tokenizer = None
         self.is_initialized = False
-        self.device = torch.device("cpu")  # Use CPU for evaluation
+        self.device = torch.device("cpu")
         
         logger.info(f"Initialized BERT model with path: {model_path}")
         
     def initialize(self) -> bool:
         """Initialize the model and tokenizer."""
         try:
-            # Load model and tokenizer
             self.model = AutoModelForTokenClassification.from_pretrained(
                 self.model_path,
                 torch_dtype=torch.float32
             )
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
             
-            # Move to CPU and set to eval mode
             self.model.to(self.device)
             self.model.eval()
             
@@ -227,7 +210,6 @@ class BERTTokenClassificationModel:
             raise RuntimeError("Model not initialized. Call initialize() first.")
         
         try:
-            # Tokenize input with offset mapping
             inputs = self.tokenizer(
                 text,
                 return_tensors="pt",
@@ -237,28 +219,22 @@ class BERTTokenClassificationModel:
                 return_offsets_mapping=True
             )
             
-            # Move to device
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
-            # Get predictions
             with torch.no_grad():
                 outputs = self.model(**{k: v for k, v in inputs.items() if k != 'offset_mapping'})
                 predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
                 predicted_token_class_ids = predictions.argmax(dim=-1).squeeze().tolist()
             
-            # Handle single token case
             if isinstance(predicted_token_class_ids, int):
                 predicted_token_class_ids = [predicted_token_class_ids]
             
-            # Convert token predictions to PII entities and spans
             entities_dict, spans = self._convert_predictions_to_entities(
                 text, inputs, predicted_token_class_ids
             )
             
-            # Reconstruct masked text
             masked_text = self._reconstruct_masked_text(text, spans)
             
-            # Create PIIPrediction object
             prediction = PIIPrediction(
                 entities=entities_dict,
                 spans=spans,
@@ -270,7 +246,6 @@ class BERTTokenClassificationModel:
             
         except Exception as e:
             logger.error(f"Error during prediction: {e}")
-            # Return empty prediction on error
             return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
     
     def _convert_predictions_to_entities(self, text: str, inputs: Dict, predicted_ids: List[int]) -> tuple:
@@ -279,23 +254,20 @@ class BERTTokenClassificationModel:
         offset_mapping = inputs['offset_mapping'].squeeze().tolist()
         tokens = self.tokenizer.convert_ids_to_tokens(inputs['input_ids'].squeeze())
         
-        # Handle single token case
         if not isinstance(offset_mapping[0], list):
             offset_mapping = [offset_mapping]
         if isinstance(tokens, str):
             tokens = [tokens]
         
-        # First pass: collect all individual token predictions
         raw_spans = []
         
         for i, (token, pred_id, (start, end)) in enumerate(zip(tokens, predicted_ids, offset_mapping)):
-            # Skip special tokens and empty spans
             if token in ['[CLS]', '[SEP]', '[PAD]'] or start == end == 0:
                 continue
                 
             pred_label = self.model.config.id2label[pred_id]
             
-            if pred_label != 'O':  # PII token
+            if pred_label != 'O':
                 raw_spans.append({
                     'entity_type': pred_label,
                     'start': start,
@@ -303,10 +275,8 @@ class BERTTokenClassificationModel:
                     'text': text[start:end].strip()
                 })
         
-        # Second pass: merge adjacent spans of the same type
         merged_spans = self._merge_adjacent_spans(text, raw_spans)
         
-        # Third pass: create entities dict and final spans
         entities_dict = {}
         final_spans = []
         
@@ -314,13 +284,11 @@ class BERTTokenClassificationModel:
             entity_type = span_info['entity_type']
             entity_text = span_info['text']
             
-            # Add to entities dictionary
             if entity_type not in entities_dict:
                 entities_dict[entity_type] = []
             if entity_text not in entities_dict[entity_type]:
                 entities_dict[entity_type].append(entity_text)
             
-            # Add to spans list
             final_spans.append(EntitySpan(
                 entity_type=entity_type,
                 start=span_info['start'],
@@ -335,27 +303,22 @@ class BERTTokenClassificationModel:
         if not raw_spans:
             return []
         
-        # Sort spans by start position
         sorted_spans = sorted(raw_spans, key=lambda x: x['start'])
         merged_spans = []
         
         current_span = sorted_spans[0].copy()
         
         for next_span in sorted_spans[1:]:
-            # Check if spans are of the same type and close to each other
             if (current_span['entity_type'] == next_span['entity_type'] and 
                 self._should_merge_spans(text, current_span, next_span)):
                 
-                # Merge spans: extend the current span to include the next one
                 current_span['end'] = next_span['end']
                 current_span['text'] = text[current_span['start']:current_span['end']].strip()
                 
             else:
-                # Different type or too far apart, save current and start new
                 merged_spans.append(current_span)
                 current_span = next_span.copy()
         
-        # Don't forget the last span
         merged_spans.append(current_span)
         
         return merged_spans
@@ -365,20 +328,17 @@ class BERTTokenClassificationModel:
         if span1['entity_type'] != span2['entity_type']:
             return False
         
-        # Get the text between the spans
         between_start = span1['end']
         between_end = span2['start']
         
         if between_end <= between_start:
-            return True  # Adjacent or overlapping
+            return True
         
         between_text = text[between_start:between_end]
         
-        # Merge if only whitespace and simple punctuation, and not too long
         if len(between_text) <= 3 and between_text.strip() in ['', ',', '.', '-', '/', ':', ';']:
             return True
         
-        # Also merge if it's just whitespace
         if between_text.isspace() and len(between_text) <= 2:
             return True
         
@@ -388,10 +348,8 @@ class BERTTokenClassificationModel:
         """Reconstruct masked text from spans."""
         masked_text = text
         
-        # Sort spans by start position in reverse order for replacement
         reverse_sorted_spans = sorted(spans, key=lambda x: x.start, reverse=True)
         
-        # Replace each span with placeholder
         entity_counters = {}
         for span in reverse_sorted_spans:
             entity_type = span.entity_type
@@ -419,11 +377,9 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     logger.info(f"Data path: {data_path}")
     logger.info(f"Results path: {results_path}")
     
-    # Load processed data
     logger.info("Loading processed data...")
     examples, label2id, id2label = load_processed_data(data_path)
     
-    # Split data using same logic as training
     logger.info("Splitting data...")
     train_examples, val_examples, test_examples = split_data(
         examples, train_split=0.8, val_split=0.1, test_split=0.1
@@ -431,14 +387,12 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     
     logger.info(f"Using {len(test_examples)} test examples for evaluation")
     
-    # Initialize BERT model
     logger.info("Initializing BERT model...")
     model = BERTTokenClassificationModel(model_path)
     if not model.initialize():
         logger.error("Failed to initialize BERT model")
         return
     
-    # Convert test examples to PIIExample format
     logger.info("Converting test examples to PIIExample format...")
     pii_examples = []
     for i, bert_example in enumerate(test_examples):
@@ -451,7 +405,6 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     
     logger.info(f"Successfully converted {len(pii_examples)} examples")
     
-    # Generate predictions
     logger.info("Generating predictions...")
     predictions = []
     failed_predictions = 0
@@ -466,7 +419,6 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
                     
         except Exception as e:
             logger.error(f"Error predicting example {i}: {e}")
-            # Add empty prediction
             predictions.append(PIIPrediction(
                 entities={}, 
                 spans=[], 
@@ -477,7 +429,6 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
     
     logger.info(f"Generated {len(predictions)} predictions ({failed_predictions} failed)")
     
-    # Initialize evaluator and run evaluation
     logger.info("Running entity-level evaluation...")
     evaluator = CustomPIIEvaluator()
     
@@ -497,7 +448,6 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
         }
     )
     
-    # Print results
     logger.info("Evaluation completed!")
     print("\n" + "="*80)
     print("BERT CLASSIC TOKEN CLASSIFICATION - ENTITY-LEVEL EVALUATION RESULTS")
@@ -521,7 +471,6 @@ def evaluate_bert_model(model_path: str, data_path: str, results_path: str):
         print(f"    Recall: {metrics['recall']:.4f}")
         print(f"    F1-Score: {metrics['f1_score']:.4f}")
     
-    # Save results
     os.makedirs(results_path, exist_ok=True)
     results_file = os.path.join(results_path, "bert_classic_token_classification_entity_eval.json")
     
@@ -539,12 +488,10 @@ def main():
     print("BERT Classic PII Token Classification - Entity-Level Evaluation")
     print("="*60)
     
-    # Configuration
     model_path = "/Users/twin/Documents/pii-masking-200k/models/bert_classic_token_classif"
     data_path = "/Users/twin/Documents/pii-masking-200k/data/processed_data_bert"
     results_path = "/Users/twin/Documents/pii-masking-200k/results"
     
-    # Check if model exists
     if not Path(model_path).exists():
         print(f"Model not found at {model_path}")
         print("Please ensure you have:")
@@ -552,13 +499,11 @@ def main():
         print("   2. Downloaded the model from Kaggle to the models directory")
         return
     
-    # Check if data exists
     if not Path(data_path).exists():
         print(f"Data not found at {data_path}")
         print("💡 Please ensure the processed BERT data exists")
         return
     
-    # Run evaluation
     try:
         evaluate_bert_model(model_path, data_path, results_path)
     except Exception as e:

@@ -19,7 +19,6 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from io import BytesIO
 
-# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pii_masking import PIIDataLoader, PIIExample, PIIPrediction
@@ -29,7 +28,6 @@ from pii_masking.custom_evaluator import CustomPIIEvaluator, CustomEvaluationRes
 from mistralai import Mistral, File
 from mistralai.models import UserMessage
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -59,7 +57,6 @@ class FineTunedMistralModel(BasePIIModel):
         
         try:
             
-            # Create prompt for fine-tuned model (simpler since it's trained)
             prompt = f"""Please extract all Personal Identifiable Information (PII) from the text.
 Text to analyze:
 {text}"""
@@ -76,12 +73,10 @@ Text to analyze:
             json_prediction = response.choices[0].message.content.strip()
             logger.debug(f"Fine-tuned model output: {str(json_prediction)}")
             
-            # Create complete PIIPrediction object with spans and masked text
             return PIIPrediction.from_json_and_text(json_prediction, text)
             
         except Exception as e:
             logger.error(f"Error in fine-tuned model API call: {e}")
-            # Return empty prediction on error
             return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
     
     def predict_dataset(self, examples: List[PIIExample], 
@@ -91,18 +86,15 @@ Text to analyze:
         """
         Predict PII entities for a dataset with optional batching and sampling.
         """
-        # Sample examples if requested
         if max_samples is not None and len(examples) > max_samples:
             import random
             examples = random.sample(examples, max_samples)
             logger.info(f"Sampled {max_samples} examples from {len(examples)} total")
         
-        # Use batch inference if available and requested
         if use_batch_inference and hasattr(self, 'predict_batch_inference'):
             logger.info(f"Using batch inference for {len(examples)} examples")
             return self.predict_batch_inference(examples, **kwargs)
         
-        # Fallback to standard batch processing
         logger.info(f"Using standard batch processing for {len(examples)} examples")
         return self.predict_examples(examples, **kwargs)
     
@@ -118,19 +110,15 @@ Text to analyze:
 
         logger.info(f"Starting batch inference for {len(examples)} examples")
 
-        # Create batch input file
         batch_file = self._create_batch_input_file(examples)
         logger.info(f"Created batch input file: {batch_file.id}")
 
-        # Create and run batch job
         batch_job = self._run_batch_job(batch_file)
         logger.info(f"Batch job completed: {batch_job.id}")
 
-        # Download and parse results
         json_predictions = self._parse_batch_results(batch_job, len(examples))
         logger.info(f"Parsed {len(json_predictions)} JSON predictions from batch results")
         
-        # Convert JSON predictions to complete PIIPrediction objects
         predictions = []
         for i, json_pred in enumerate(json_predictions):
             try:
@@ -138,7 +126,6 @@ Text to analyze:
                 predictions.append(prediction)
             except Exception as e:
                 logger.error(f"Error creating PIIPrediction for example {i}: {e}")
-                # Empty prediction on error
                 empty_prediction = PIIPrediction(
                     entities={}, 
                     spans=[], 
@@ -149,15 +136,11 @@ Text to analyze:
 
         return predictions
     
-    # Note: get_predictions_as_objects() method is no longer needed 
-    # since predict methods now return PIIPrediction objects directly
-    
     def _create_batch_input_file(self, examples: List[PIIExample]) -> File:
         """Create a JSONL file for batch inference."""
         buffer = BytesIO()
         
         for idx, example in enumerate(examples):
-            # Create prompt for this example
             try:
                 prompt = f"""Please extract all Personal Identifiable Information (PII) from the text.
 Text to analyze:
@@ -166,7 +149,6 @@ Text to analyze:
                 logger.error(f"Error creating prompt for example {idx}: {e}")
                 raise
             
-            # Create batch request
             request = {
                 "custom_id": str(idx),
                 "body": {
@@ -178,11 +160,9 @@ Text to analyze:
                 }
             }
             
-            # Write to buffer
             buffer.write(json.dumps(request).encode("utf-8"))
             buffer.write("\n".encode("utf-8"))
         
-        # Upload file
         return self.client.files.upload(
             file=File(
                 file_name=f"pii_finetuned_batch_{len(examples)}.jsonl",
@@ -193,7 +173,6 @@ Text to analyze:
     
     def _run_batch_job(self, input_file: File):
         """Run the batch job and wait for completion."""
-        # Create batch job
         batch_job = self.client.batch.jobs.create(
             input_files=[input_file.id],
             model=self.model_name,
@@ -203,17 +182,15 @@ Text to analyze:
         
         logger.info(f"Created batch job {batch_job.id}, status: {batch_job.status}")
         
-        # Wait for completion with progress updates
         while batch_job.status in ["QUEUED", "RUNNING"]:
             batch_job = self.client.batch.jobs.get(job_id=batch_job.id)
             
-            # Log progress
             if hasattr(batch_job, 'total_requests') and batch_job.total_requests > 0:
                 completed = (batch_job.succeeded_requests or 0) + (batch_job.failed_requests or 0)
                 progress = (completed / batch_job.total_requests) * 100
                 logger.info(f"Batch progress: {progress:.1f}% ({completed}/{batch_job.total_requests})")
             
-            time.sleep(5)  # Check every 5 seconds
+            time.sleep(5)
         
         if batch_job.status != "SUCCESS":
             logger.error(f"Batch job failed with status: {batch_job.status}")
@@ -226,18 +203,15 @@ Text to analyze:
         if not batch_job.output_file:
             raise RuntimeError("No output file available from batch job")
         
-        # Download results
         output_stream = self.client.files.download(file_id=batch_job.output_file)
         results_content = output_stream.read().decode('utf-8')
         
-        # Parse JSONL results
         results_by_id = {}
         for line in results_content.strip().split('\n'):
             if line:
                 result = json.loads(line)
                 custom_id = int(result['custom_id'])
                 
-                # Extract prediction from response
                 if 'response' in result and 'body' in result['response']:
                     choices = result['response']['body'].get('choices', [])
                     if choices:
@@ -250,7 +224,6 @@ Text to analyze:
                     logger.warning(f"Invalid result format for ID {custom_id}")
                     results_by_id[custom_id] = '{"PII": {}}'
         
-        # Ensure we have results in the correct order
         predictions = []
         for i in range(expected_count):
             if i in results_by_id:
@@ -279,7 +252,6 @@ def run_finetuned_experiment(
     Returns:
         CustomEvaluationResult object with evaluation metrics
     """
-    # Load environment variables
     from dotenv import load_dotenv
     load_dotenv()
     
@@ -288,11 +260,9 @@ def run_finetuned_experiment(
     if not api_key:
         raise ValueError("MISTRAL_API_KEY environment variable not set")
     
-    # Initialize components
     data_loader = PIIDataLoader(data_dir=Path(dataset_path).parent)
     evaluator = CustomPIIEvaluator()
     
-    # Load dataset
     logger.info(f"Loading dataset from {dataset_path}")
     examples = data_loader.load_dataset(
         language='english',
@@ -306,7 +276,6 @@ def run_finetuned_experiment(
     
     logger.info(f"Loaded {len(examples)} examples")
     
-    # Initialize model
     model_config = config.get('model_config', {}) if config else {}
     model = FineTunedMistralModel(
         model_name=fine_tuned_model_name,
@@ -317,14 +286,11 @@ def run_finetuned_experiment(
     if not model.initialize():
         raise RuntimeError("Failed to initialize fine-tuned Mistral model")
     
-    # Generate predictions using dataset method (supports batch inference)
     logger.info("Generating predictions...")
     
-    # Determine whether to use batch inference
     if 'use_batch_inference' in config:
         use_batch_inference = config['use_batch_inference']
     else:
-        # Auto-enable for large datasets
         use_batch_inference = len(examples) > 10
     
     if use_batch_inference:
@@ -338,7 +304,6 @@ def run_finetuned_experiment(
         texts = [example.unmasked_text for example in examples]
         predictions = model.predict_batch(texts)
     
-    # Evaluate results
     logger.info("Evaluating results...")
     experiment_config = {
         'num_samples': len(examples),
@@ -355,15 +320,12 @@ def run_finetuned_experiment(
         config=experiment_config
     )
     
-    # Print results
     evaluator.print_evaluation_report(result)
     
-    # Save results
     results_dir = Path(__file__).parent.parent / "results"
     results_dir.mkdir(exist_ok=True)
     results_file = results_dir / f"fine_tuned_{fine_tuned_model_name.replace('/', '_')}.json"
     
-    # Save results as JSON
     result_dict = result.to_dict()
     
     with open(results_file, 'w') as f:
@@ -371,7 +333,6 @@ def run_finetuned_experiment(
     
     logger.info(f"Results saved to {results_file}")
     
-    # Cleanup
     model.cleanup()
     
     return result
@@ -409,7 +370,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Prepare config
     config = {
         'model_config': {
             'temperature': 0.1,
@@ -419,7 +379,6 @@ def main():
         }
     }
     
-    # Handle batch inference settings
     if args.batch_inference:
         config['use_batch_inference'] = True
     elif args.no_batch_inference:

@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from io import BytesIO
 
-# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pii_masking import PIIDataLoader, PIIExample, PIIPrediction
@@ -28,7 +27,6 @@ from pii_masking.custom_evaluator import CustomPIIEvaluator, CustomEvaluationRes
 from mistralai import Mistral as MistralClient, File
 from mistralai.models import UserMessage
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -40,7 +38,6 @@ class MistralEfficientNERModel(PromptBasedModel):
         self.api_key = api_key
         self.client = None
         
-        # Define the JSON-based prompt template
         self.prompt_template = """You are an expert in Personal Identifiable Information (PII) detection.
 
 Your task is to analyze the provided text and identify ALL PII entities, returning them as a structured JSON.
@@ -69,20 +66,17 @@ JSON Output:"""
     
     def create_prompt(self, text: str, few_shot_examples: Optional[List[PIIExample]] = None) -> str:
         """Create a prompt for JSON-based PII detection."""
-        # Handle few-shot examples
         examples_text = ""
         if few_shot_examples:
             examples_text = "\nExamples:\n\n"
             
             for i, example in enumerate(few_shot_examples[-3:], 1):  # Limit to 3 examples
-                # Convert ground truth spans to JSON format for examples
                 pii_json = self._spans_to_json(example.unmasked_text, example.span_labels)
                 
                 examples_text += f"Example {i}:\n"
                 examples_text += f"Text: {example.unmasked_text}\n"
                 examples_text += f"JSON: {json.dumps(pii_json, ensure_ascii=False)}\n\n"
         
-        # Replace placeholders in template
         prompt = self.prompt_template.replace("{examples}", examples_text)
         prompt = prompt.replace("{text}", text)
         
@@ -101,22 +95,18 @@ JSON Output:"""
             if len(span) >= 3:
                 start, end, label = span[0], span[1], span[2]
                 
-                # Remove BIO prefixes and suffixes
                 entity_type = label.replace('B-', '').replace('I-', '')
                 if '_' in entity_type:
                     entity_type = entity_type.split('_')[0]
                 
-                # Skip "O" labels (non-PII text) in few-shot examples
                 if entity_type == 'O':
                     continue
                 
-                # Extract substring
                 substring = text[start:end]
                 
                 if entity_type not in pii_dict:
                     pii_dict[entity_type] = []
                 
-                # Avoid duplicates
                 if substring not in pii_dict[entity_type]:
                     pii_dict[entity_type].append(substring)
         
@@ -159,12 +149,10 @@ JSON Output:"""
             json_prediction = response.choices[0].message.content.strip()
             logger.debug(f"LLM output: {str(json_prediction)}")
             
-            # Create complete PIIPrediction object with spans and masked text
             return PIIPrediction.from_json_and_text(json_prediction, text)
             
         except Exception as e:
             logger.error(f"Error in Mistral API call: {e}")
-            # Return empty prediction on error
             return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
     
     def predict_batch(self, texts: List[str], **kwargs) -> List[PIIPrediction]:
@@ -182,12 +170,10 @@ JSON Output:"""
                 prediction = self.predict_single(text, **kwargs)
                 predictions.append(prediction)
                 
-                # Progress logging
                 if (i + 1) % 10 == 0:
                     logger.info(f"Processed {i + 1}/{len(texts)} texts")
                 
-                # Rate limiting
-                if i < len(texts) - 1:  # Don't sleep after last request
+                if i < len(texts) - 1:
                     time.sleep(rate_limit_delay)
                     
             except Exception as e:
@@ -212,19 +198,15 @@ JSON Output:"""
 
         logger.info(f"Starting batch inference for {len(examples)} examples")
 
-        # Create batch input file
         batch_file = self._create_batch_input_file(examples, few_shot_examples)
         logger.info(f"Created batch input file: {batch_file.id}")
 
-        # Create and run batch job
         batch_job = self._run_batch_job(batch_file)
         logger.info(f"Batch job completed: {batch_job.id}")
 
-        # Download and parse results
         json_predictions = self._parse_batch_results(batch_job, len(examples))
         logger.info(f"Parsed {len(json_predictions)} JSON predictions from batch results")
         
-        # Convert JSON predictions to complete PIIPrediction objects
         predictions = []
         for i, json_pred in enumerate(json_predictions):
             try:
@@ -243,9 +225,6 @@ JSON Output:"""
 
         return predictions
     
-    # Note: get_predictions_as_objects() method is no longer needed 
-    # since predict methods now return PIIPrediction objects directly
-    
     def predict_dataset(self, examples: List[PIIExample], 
                        max_samples: Optional[int] = None,
                        use_batch_inference: bool = False,
@@ -253,18 +232,15 @@ JSON Output:"""
         """
         Predict PII entities for a dataset with optional batching and sampling.
         """
-        # Sample examples if requested
         if max_samples is not None and len(examples) > max_samples:
             import random
             examples = random.sample(examples, max_samples)
             logger.info(f"Sampled {max_samples} examples from {len(examples)} total")
         
-        # Use batch inference if available and requested
         if use_batch_inference and hasattr(self, 'predict_batch_inference'):
             logger.info(f"Using batch inference for {len(examples)} examples")
             return self.predict_batch_inference(examples, **kwargs)
         
-        # Fallback to standard batch processing
         logger.info(f"Using standard batch processing for {len(examples)} examples")
         return self.predict_examples(examples, **kwargs)
     
@@ -274,14 +250,12 @@ JSON Output:"""
         buffer = BytesIO()
         
         for idx, example in enumerate(examples):
-            # Create prompt for this example
             try:
                 prompt = self.create_prompt(example.unmasked_text, few_shot_examples)
             except Exception as e:
                 logger.error(f"Error creating prompt for example {idx}: {e}")
                 raise
             
-            # Create batch request
             request = {
                 "custom_id": str(idx),
                 "body": {
@@ -293,11 +267,9 @@ JSON Output:"""
                 }
             }
             
-            # Write to buffer
             buffer.write(json.dumps(request).encode("utf-8"))
             buffer.write("\n".encode("utf-8"))
         
-        # Upload file
         return self.client.files.upload(
             file=File(
                 file_name=f"pii_efficient_batch_{len(examples)}.jsonl",
@@ -308,7 +280,6 @@ JSON Output:"""
     
     def _run_batch_job(self, input_file: File):
         """Run the batch job and wait for completion."""
-        # Create batch job
         batch_job = self.client.batch.jobs.create(
             input_files=[input_file.id],
             model=self.model_name,
@@ -318,17 +289,15 @@ JSON Output:"""
         
         logger.info(f"Created batch job {batch_job.id}, status: {batch_job.status}")
         
-        # Wait for completion with progress updates
         while batch_job.status in ["QUEUED", "RUNNING"]:
             batch_job = self.client.batch.jobs.get(job_id=batch_job.id)
             
-            # Log progress
             if hasattr(batch_job, 'total_requests') and batch_job.total_requests > 0:
                 completed = (batch_job.succeeded_requests or 0) + (batch_job.failed_requests or 0)
                 progress = (completed / batch_job.total_requests) * 100
                 logger.info(f"Batch progress: {progress:.1f}% ({completed}/{batch_job.total_requests})")
             
-            time.sleep(5)  # Check every 5 seconds
+            time.sleep(5)
         
         if batch_job.status != "SUCCESS":
             logger.error(f"Batch job failed with status: {batch_job.status}")
@@ -341,18 +310,15 @@ JSON Output:"""
         if not batch_job.output_file:
             raise RuntimeError("No output file available from batch job")
         
-        # Download results
         output_stream = self.client.files.download(file_id=batch_job.output_file)
         results_content = output_stream.read().decode('utf-8')
         
-        # Parse JSONL results
         results_by_id = {}
         for line in results_content.strip().split('\n'):
             if line:
                 result = json.loads(line)
                 custom_id = int(result['custom_id'])
                 
-                # Extract prediction from response
                 if 'response' in result and 'body' in result['response']:
                     choices = result['response']['body'].get('choices', [])
                     if choices:
@@ -365,7 +331,6 @@ JSON Output:"""
                     logger.warning(f"Invalid result format for ID {custom_id}")
                     results_by_id[custom_id] = '{"PII": {}}'
         
-        # Ensure we have results in the correct order
         predictions = []
         for i in range(expected_count):
             if i in results_by_id:
@@ -396,7 +361,6 @@ def run_mistral_efficient_experiment(
     Returns:
         CustomEvaluationResult object with evaluation metrics
     """
-    # Load environment variables
     from dotenv import load_dotenv
     load_dotenv()
     
@@ -406,11 +370,9 @@ def run_mistral_efficient_experiment(
     if not api_key:
         raise ValueError("MISTRAL_API_KEY environment variable not set")
     
-    # Initialize components
     data_loader = PIIDataLoader(data_dir=Path(dataset_path).parent)
     evaluator = CustomPIIEvaluator()
     
-    # Load dataset
     logger.info(f"Loading dataset from {dataset_path}")
     examples = data_loader.load_dataset(
         language='english',
@@ -424,28 +386,23 @@ def run_mistral_efficient_experiment(
     
     logger.info(f"Loaded {len(examples)} examples")
     
-    # Initialize model
     model_config = config.get('model_config', {}) if config else {}
     model = MistralEfficientNERModel(api_key=api_key, model_name=model_name, config=model_config)
     
     if not model.initialize():
         raise RuntimeError("Failed to initialize Mistral model")
     
-    # Prepare few-shot examples if requested
     few_shot_examples = None
     if use_few_shot and num_few_shot > 0:
         few_shot_examples = examples[:num_few_shot]
-        examples = examples[num_few_shot:]  # Remove few-shot examples from evaluation
+        examples = examples[num_few_shot:]
         logger.info(f"Using {num_few_shot} few-shot examples")
     
-    # Generate predictions using dataset method (supports batch inference)
     logger.info("Generating predictions...")
     
-    # Determine whether to use batch inference
     if 'use_batch_inference' in config:
         use_batch_inference = config['use_batch_inference']
     else:
-        # Auto-enable for large datasets
         use_batch_inference = len(examples) > 50
     
     if use_batch_inference:
@@ -460,7 +417,6 @@ def run_mistral_efficient_experiment(
         texts = [example.unmasked_text for example in examples]
         predictions = model.predict_batch(texts, few_shot_examples=few_shot_examples)
     
-    # Evaluate results
     logger.info("Evaluating results...")
     experiment_config = {
         'num_samples': len(examples),
@@ -478,15 +434,12 @@ def run_mistral_efficient_experiment(
         config=experiment_config
     )
     
-    # Print results
     evaluator.print_evaluation_report(result)
     
-    # Save results
     results_dir = Path(__file__).parent.parent / "results"
     results_dir.mkdir(exist_ok=True)
     results_file = results_dir / "mistral_efficient_ner.json"
     
-    # Save results as JSON
     result_dict = result.to_dict()
     
     with open(results_file, 'w') as f:
@@ -494,7 +447,6 @@ def run_mistral_efficient_experiment(
     
     logger.info(f"Results saved to {results_file}")
     
-    # Cleanup
     model.cleanup()
     
     return result
@@ -543,7 +495,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Prepare config
     config = {
         'model_name': args.model,
         'model_config': {
@@ -554,7 +505,6 @@ def main():
         }
     }
     
-    # Handle batch inference settings
     if args.batch_inference:
         config['use_batch_inference'] = True
     elif args.no_batch_inference:

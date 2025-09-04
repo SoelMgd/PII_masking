@@ -15,7 +15,6 @@ from typing import List, Dict, Tuple, Optional, Set
 from dataclasses import dataclass
 from collections import defaultdict
 
-# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from pii_masking import PIIDataLoader, PIIExample
@@ -32,7 +31,7 @@ class TokenClassificationExample:
     tokens: List[str]
     labels: List[str]
     original_text: str
-    token_spans: List[Tuple[int, int]]  # Character spans for each token
+    token_spans: List[Tuple[int, int]]
 
 class PIITokenClassificationProcessor:
     """
@@ -65,22 +64,17 @@ class PIITokenClassificationProcessor:
         Returns:
             TokenClassificationExample with aligned tokens and labels
         """
-        # Tokenize and get token spans
         encoding = self.tokenizer(text, return_offsets_mapping=True, add_special_tokens=True)
         tokens = self.tokenizer.convert_ids_to_tokens(encoding['input_ids'])
         token_spans = encoding['offset_mapping']
         
-        # Create span lookup for efficient intersection checking
         span_lookup = self._create_span_lookup(span_labels)
         
-        # Assign labels to tokens
         labels = []
         for i, (token, (start, end)) in enumerate(zip(tokens, token_spans)):
             if token in ['[CLS]', '[SEP]'] or start == end == 0:
-                # Special tokens get 'O' label
                 labels.append('O')
             else:
-                # Find PII label based on token span intersection
                 label = self._get_token_label(start, end, span_lookup)
                 labels.append(label)
                 self.label_set.add(label)
@@ -106,9 +100,8 @@ class PIITokenClassificationProcessor:
         for span in span_labels:
             if len(span) >= 3:
                 start, end, label = span[0], span[1], span[2]
-                # Clean up label (remove BIO prefixes, suffixes)
                 clean_label = self._clean_label(label)
-                if clean_label != 'O':  # Skip non-PII spans
+                if clean_label != 'O':
                     span_lookup[(start, end)] = clean_label
         return span_lookup
     
@@ -122,10 +115,8 @@ class PIITokenClassificationProcessor:
         Returns:
             Clean label (e.g., 'FIRSTNAME', 'EMAIL')
         """
-        # Remove BIO prefixes
         label = label.replace('B-', '').replace('I-', '')
         
-        # Remove numeric suffixes (e.g., '_1', '_2')
         if '_' in label:
             label = label.split('_')[0]
         
@@ -148,11 +139,10 @@ class PIITokenClassificationProcessor:
             PII label or 'O' if no intersection
         """
         for (span_start, span_end), label in span_lookup.items():
-            # Check if token intersects with this span
             if self._spans_intersect(token_start, token_end, span_start, span_end):
                 return label
         
-        return 'O'  # No intersection found
+        return 'O'
     
     def _spans_intersect(self, t_start: int, t_end: int, s_start: int, s_end: int) -> bool:
         """
@@ -237,17 +227,15 @@ class PIITokenClassificationProcessor:
 
 def main():
     """Main processing function."""
-    # Configuration
     dataset_path = "../../data/english_pii_43k.jsonl"
     output_dir = Path("processed_data")
     output_dir.mkdir(exist_ok=True)
     
     tokenizer_name = "distilbert-base-uncased"
-    max_samples = None  # Process all samples, set to number for testing
+    max_samples = None
     
     logger.info(f"Starting dataset processing with tokenizer: {tokenizer_name}")
     
-    # Load dataset
     data_loader = PIIDataLoader(data_dir=Path(dataset_path).parent)
     examples = data_loader.load_dataset(
         language='english',
@@ -260,20 +248,16 @@ def main():
     
     logger.info(f"Loaded {len(examples)} examples from dataset")
     
-    # Process examples
     processor = PIITokenClassificationProcessor(tokenizer_name=tokenizer_name)
     processed_examples = processor.process_examples(examples)
     
-    # Create label mappings
     label2id, id2label = processor.create_label_mappings()
     
-    # Save processed dataset
     processor.save_processed_dataset(
         processed_examples, 
         output_dir / "processed_examples.json"
     )
     
-    # Save label mappings
     with open(output_dir / "label_mappings.json", 'w') as f:
         json.dump({
             'label2id': label2id,
@@ -281,13 +265,11 @@ def main():
             'num_labels': len(label2id)
         }, f, indent=2)
     
-    # Print statistics
     logger.info("Processing completed successfully!")
     logger.info(f"Total processed examples: {len(processed_examples)}")
     logger.info(f"Number of unique labels: {len(label2id)}")
     logger.info(f"Labels: {sorted(label2id.keys())}")
     
-    # Show example
     if processed_examples:
         example = processed_examples[0]
         logger.info(f"\nExample processed output:")

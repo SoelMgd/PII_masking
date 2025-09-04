@@ -19,12 +19,10 @@ from pathlib import Path
 from typing import List, Dict, Any
 from collections import defaultdict
 
-# Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from pii_masking import PIIDataLoader, PIIExample
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -51,16 +49,13 @@ class PIIDatasetProcessor:
         Returns:
             Dictionary in Mistral fine-tuning format
         """
-        # Create the user prompt
         user_prompt = f"""Please extract all Personal Identifiable Information (PII) from the text.
 Text to analyze:
 {example.unmasked_text}"""
 
-        # Create the assistant response (ground truth JSON)
         pii_dict = self._spans_to_json(example.unmasked_text, example.span_labels)
         assistant_response = json.dumps(pii_dict, ensure_ascii=False)
         
-        # Return in Mistral format
         return {
             "messages": [
                 {
@@ -91,22 +86,18 @@ Text to analyze:
             if len(span) >= 3:
                 start, end, label = span[0], span[1], span[2]
                 
-                # Remove BIO prefixes and suffixes
                 entity_type = label.replace('B-', '').replace('I-', '')
                 if '_' in entity_type:
                     entity_type = entity_type.split('_')[0]
                 
-                # Skip "O" labels (non-PII text)
                 if entity_type == 'O':
                     continue
                 
-                # Extract substring
                 substring = text[start:end]
                 
                 if entity_type not in pii_dict:
                     pii_dict[entity_type] = []
                 
-                # Avoid duplicates
                 if substring not in pii_dict[entity_type]:
                     pii_dict[entity_type].append(substring)
         
@@ -124,7 +115,6 @@ Text to analyze:
         """
         logger.info("Loading English PII dataset...")
         
-        # Load examples
         examples = self.data_loader.load_dataset(
             language='english',
             max_samples=max_samples,
@@ -138,7 +128,6 @@ Text to analyze:
         
         logger.info(f"Loaded {len(examples)} examples from English dataset")
         
-        # Convert to Mistral format
         processed_examples = []
         for example in examples:
             try:
@@ -162,10 +151,8 @@ Text to analyze:
         Returns:
             Tuple of (train_examples, val_examples)
         """
-        # Shuffle examples
         random.shuffle(examples)
         
-        # Calculate split point
         val_size = int(len(examples) * val_ratio)
         train_size = len(examples) - val_size
         
@@ -206,7 +193,6 @@ Text to analyze:
         total_entities = 0
         
         for example in examples:
-            # Parse assistant response to count entities
             try:
                 assistant_content = example['messages'][1]['content']
                 pii_data = json.loads(assistant_content)
@@ -256,36 +242,29 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize processor
     processor = PIIDatasetProcessor(data_dir=Path(args.data_dir))
     output_dir = Path(args.output_dir)
     
-    # Process English dataset
     all_examples = processor.load_and_process_dataset(max_samples=args.max_samples)
     
     if not all_examples:
         logger.error("No examples processed. Check your data directory and files.")
         return
     
-    # Shuffle dataset
     random.shuffle(all_examples)
     logger.info(f"Processed dataset: {len(all_examples)} examples")
     
-    # Get dataset stats
     dataset_stats = processor.get_dataset_stats(all_examples)
     logger.info(f"Dataset stats: {dataset_stats}")
     
-    # Create train/val split
     train_examples, val_examples = processor.create_train_val_split(
         all_examples, 
         val_ratio=args.val_ratio
     )
     
-    # Save datasets
     processor.save_jsonl(train_examples, output_dir / "train.jsonl")
     processor.save_jsonl(val_examples, output_dir / "validation.jsonl")
     
-    # Save statistics
     stats = {
         'dataset_stats': dataset_stats,
         'train_size': len(train_examples),
