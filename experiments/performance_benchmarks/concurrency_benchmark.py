@@ -3,7 +3,6 @@
 Concurrency Benchmark for PII Masking Services.
 
 Tests the async/sync architecture performance with sequential vs concurrent requests.
-This is the key differentiator of your architecture!
 """
 
 import asyncio

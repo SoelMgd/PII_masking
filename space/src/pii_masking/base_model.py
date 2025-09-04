@@ -12,7 +12,6 @@ from .text_processing import PIIPrediction, reconstruct_masked_text_from_predict
 
 logger = logging.getLogger(__name__)
 
-# Legacy utility function for backward compatibility
 def reconstruct_masked_text_from_prediction(text: str, prediction: Union[str, PIIPrediction]) -> str:
     """
     Reconstruct masked text from a prediction.
@@ -146,18 +145,15 @@ class BasePIIModel(ABC):
         Returns:
             List of PIIPrediction objects with pre-computed entities, spans, and masked text.
         """
-        # Sample examples if requested
         if max_samples is not None and len(examples) > max_samples:
             import random
             examples = random.sample(examples, max_samples)
             logger.info(f"Sampled {max_samples} examples from {len(examples)} total")
         
-        # Use batch inference if available and requested
         if use_batch_inference and hasattr(self, 'predict_batch_inference'):
             logger.info(f"Using batch inference for {len(examples)} examples")
             return self.predict_batch_inference(examples, **kwargs)
         
-        # Fallback to standard batch processing
         logger.info(f"Using standard batch processing for {len(examples)} examples")
         return self.predict_examples(examples, **kwargs)
     

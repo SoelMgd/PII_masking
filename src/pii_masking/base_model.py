@@ -12,7 +12,6 @@ from .text_processing import PIIPrediction, reconstruct_masked_text_from_predict
 
 logger = logging.getLogger(__name__)
 
-# Legacy utility function for backward compatibility
 def reconstruct_masked_text_from_prediction(text: str, prediction: Union[str, PIIPrediction]) -> str:
     """
     Reconstruct masked text from a prediction.
@@ -146,18 +145,15 @@ class BasePIIModel(ABC):
         Returns:
             List of PIIPrediction objects with pre-computed entities, spans, and masked text.
         """
-        # Sample examples if requested
         if max_samples is not None and len(examples) > max_samples:
             import random
             examples = random.sample(examples, max_samples)
             logger.info(f"Sampled {max_samples} examples from {len(examples)} total")
         
-        # Use batch inference if available and requested
         if use_batch_inference and hasattr(self, 'predict_batch_inference'):
             logger.info(f"Using batch inference for {len(examples)} examples")
             return self.predict_batch_inference(examples, **kwargs)
         
-        # Fallback to standard batch processing
         logger.info(f"Using standard batch processing for {len(examples)} examples")
         return self.predict_examples(examples, **kwargs)
     
@@ -208,10 +204,8 @@ class PromptBasedModel(BasePIIModel):
         if self.prompt_template is None:
             raise NotImplementedError("Prompt template not defined")
         
-        # Basic template substitution
         prompt = self.prompt_template.format(text=text)
         
-        # Add few-shot examples if provided
         if few_shot_examples:
             examples_text = self._format_few_shot_examples(few_shot_examples)
             prompt = prompt.replace("{examples}", examples_text)
@@ -224,7 +218,7 @@ class PromptBasedModel(BasePIIModel):
         """Format few-shot examples for the prompt."""
         formatted = "\nExamples:\n\n"
         
-        for i, example in enumerate(examples[:3], 1):  # Limit to 3 examples
+        for i, example in enumerate(examples[:3], 1):
             formatted += f"Example {i}:\n"
             formatted += f"Input: {example.unmasked_text}\n"
             formatted += f"Output: {example.masked_text}\n\n"

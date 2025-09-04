@@ -3,11 +3,6 @@
 Speed Benchmark for PII Masking Services.
 
 Tests inference speed with different text lengths.
-
-Throughput = nombre de caractères traités par seconde (chars/s)
-- Plus le throughput est élevé, plus le service traite de texte rapidement
-- Utile pour comparer l'efficacité des services sur différentes tailles de texte
-- Exemple: 1000 chars/s = peut traiter 1000 caractères en 1 seconde
 """
 
 import asyncio
@@ -202,7 +197,6 @@ class SpeedBenchmark:
         print(f"\nServices: {', '.join(results['services_tested'])}")
         print(f"Text Categories: {', '.join(results['text_categories'])}")
         
-        # Create summary table
         print(f"\n{'Service':<20} {'Text Size':<12} {'Avg Time (s)':<12} {'Throughput (chars/s)':<20}")
         print("-" * 70)
         
@@ -215,18 +209,16 @@ class SpeedBenchmark:
                 
                 print(f"{service:<20} {category:<12} {avg_time:<12.3f} {throughput:<20.0f}")
         
-        # Performance comparison
         print(f"\n" + "="*80)
         print("PERFORMANCE COMPARISON BY TEXT LENGTH")
         print("="*80)
         
         for text_category in results['text_categories']:
-            print(f"\n📄 {text_category.upper()} TEXT:")
+            print(f"\n{text_category.upper()} TEXT:")
             category_measurements = [m for m in results['measurements'] 
                                    if m.get('text_category') == text_category and m.get('successful_runs', 0) > 0]
             
             if category_measurements:
-                # Sort by speed (fastest first)
                 category_measurements.sort(key=lambda x: x['avg_inference_time_seconds'])
                 
                 for i, m in enumerate(category_measurements, 1):
@@ -235,7 +227,6 @@ class SpeedBenchmark:
                     time_ms = time_s * 1000
                     entities = m['avg_entities_found']
                     
-                    # Speed relative to fastest
                     if i == 1:
                         speed_factor = "🥇 FASTEST"
                     else:

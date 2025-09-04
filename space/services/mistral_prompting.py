@@ -168,7 +168,6 @@ JSON Output:"""
         
         logger.info(f"Batch job created: {batch_job.id}")
         
-        # Wait for completion
         start_time = time.time()
         while batch_job.status in ["QUEUED", "RUNNING"]:
             if time.time() - start_time > self.config['batch_timeout']:
@@ -178,7 +177,6 @@ JSON Output:"""
             await asyncio.sleep(self.config['batch_poll_interval'])
             batch_job = self.client.batch.jobs.get(job_id=batch_job.id)
             
-            # Log progress
             total = batch_job.total_requests or 0
             completed = (batch_job.succeeded_requests or 0) + (batch_job.failed_requests or 0)
             if total > 0:
@@ -190,7 +188,6 @@ JSON Output:"""
         if batch_job.status != "SUCCESS":
             raise RuntimeError(f"Batch job failed with status: {batch_job.status}")
         
-        # Download results
         output_file_stream = self.client.files.download(file_id=batch_job.output_file)
         results = {}
         
@@ -218,22 +215,19 @@ JSON Output:"""
         """
         all_entities = {}
         all_spans = []
-        seen_entities = set()  # To handle overlapping entities
+        seen_entities = set()
         
         for prediction, chunk_start in chunk_results:
-            # Adjust span positions to match original text
             for span in prediction.spans:
                 adjusted_start = span.start + chunk_start
                 adjusted_end = span.end + chunk_start
                 
-                # Check if this entity overlaps with existing ones
                 entity_key = (adjusted_start, adjusted_end, span.entity_type, span.text)
                 if entity_key in seen_entities:
                     continue
                 
                 seen_entities.add(entity_key)
                 
-                # Create adjusted span
                 adjusted_span = EntitySpan(
                     entity_type=span.entity_type,
                     start=adjusted_start,
@@ -242,19 +236,15 @@ JSON Output:"""
                 )
                 all_spans.append(adjusted_span)
                 
-                # Add to entities dict
                 if span.entity_type not in all_entities:
                     all_entities[span.entity_type] = []
                 if span.text not in all_entities[span.entity_type]:
                     all_entities[span.entity_type].append(span.text)
         
-        # Sort spans by start position
         all_spans.sort(key=lambda x: x.start)
         
-        # Generate masked text
         masked_text = reconstruct_masked_text(original_text, all_entities)
         
-        # Create final prediction
         final_prediction = PIIPrediction(
             entities=all_entities,
             spans=all_spans,
@@ -276,7 +266,6 @@ JSON Output:"""
         if not text or not text.strip():
             return PIIPrediction(entities={}, spans=[], masked_text=text, original_text=text)
         
-        # For very long texts, use batch processing to avoid API limits
         if self.enable_batching and len(text) > self.config['batch_threshold']:
             return await self._predict_batch(text, pii_entities)
         else:
@@ -287,16 +276,12 @@ JSON Output:"""
         logger.info(f"Using batch processing for long text ({len(text)} chars)")
         
         try:
-            # Step 1: Chunk the text
             chunks = self._chunk_text(text)
             
-            # Step 2: Create batch file
             batch_file = await self._create_batch_file(chunks)
             
-            # Step 3: Run batch job
             batch_results = await self._run_batch_job(batch_file)
             
-            # Step 4: Process results
             chunk_predictions = []
             for i, (chunk_text, start_pos) in enumerate(chunks):
                 custom_id = f"chunk_{i}_{start_pos}"
@@ -305,16 +290,13 @@ JSON Output:"""
                     prediction = PIIPrediction.from_json_and_text(json_prediction, chunk_text)
                     chunk_predictions.append((prediction, start_pos))
                 else:
-                    # Empty prediction for missing results
                     empty_prediction = PIIPrediction(
                         entities={}, spans=[], masked_text=chunk_text, original_text=chunk_text
                     )
                     chunk_predictions.append((empty_prediction, start_pos))
             
-            # Step 5: Merge results
             final_prediction = self._merge_chunk_predictions(chunk_predictions, text)
             
-            # Filter entities if requested
             if pii_entities is not None:
                 final_prediction = self._filter_prediction_by_entities(final_prediction, pii_entities)
             
@@ -323,7 +305,6 @@ JSON Output:"""
             
         except Exception as e:
             logger.error(f"Batch processing failed: {e}")
-            # Fallback to single request
             logger.info("Falling back to single request processing")
             return await self._predict_single(text, pii_entities)
 
@@ -357,7 +338,6 @@ JSON Output:"""
             prediction = PIIPrediction.from_json_and_text(json_prediction, text)
             logger.debug(f"Found {len(prediction.spans)} PII entities")
             
-            # Filter entities if requested
             if pii_entities is not None:
                 prediction = self._filter_prediction_by_entities(prediction, pii_entities)
             
@@ -388,11 +368,9 @@ JSON Output:"""
                 prediction = await self.predict(text)
                 predictions.append(prediction)
                 
-                # Progress logging
                 if (i + 1) % 5 == 0 or i == len(texts) - 1:
                     logger.info(f"Processed {i + 1}/{len(texts)} texts")
                 
-                # Rate limiting - small delay between requests
                 if i < len(texts) - 1:
                     await asyncio.sleep(0.1)
                     
@@ -424,7 +402,6 @@ JSON Output:"""
             "description": "Mistral API-based PII detection with JSON output and batch processing support"
         }
 
-# Factory function for easy initialization
 async def create_mistral_service(api_key: Optional[str] = None, model_name: str = "mistral-large-latest", enable_batching: bool = True) -> MistralPromptingService:
     """
     Factory function to create and initialize Mistral service.
@@ -454,21 +431,17 @@ async def create_mistral_service(api_key: Optional[str] = None, model_name: str 
 async def test_service():
     """Test function for development."""
     try:
-        # Load API key from environment
         from dotenv import load_dotenv
         load_dotenv()
         
-        # Test both batching enabled and disabled
         for batching_enabled in [True, False]:
             service = await create_mistral_service(enable_batching=batching_enabled)
             batch_status = "enabled" if batching_enabled else "disabled"
             
-            # Test cases - including a long text for batch testing
             test_texts = [
                 "Hi, my name is John Smith and my email is john.smith@company.com.",
                 "Call me at 555-1234 or visit 123 Main Street.",
                 "This is a normal sentence with no PII information.",
-                # Long text to trigger batching (when enabled)
                 " ".join([
                     "This is a long document containing multiple PII entities.",
                     "My name is Alice Johnson and I work at TechCorp Inc.",
@@ -477,7 +450,7 @@ async def test_service():
                     "My date of birth is March 15, 1985 and my SSN is 123-45-6789.",
                     "I also have a secondary address at 789 Pine Street, Unit 4B.",
                     "My username is alice_j85 and my account number is ACC-2023-001.",
-                ]) * 10  # Repeat to make it long enough
+                ]) * 10
             ]
             
             print(f"\nTesting Mistral Prompting Service (batching {batch_status})")
@@ -502,5 +475,4 @@ async def test_service():
         print(f"Test failed: {e}")
 
 if __name__ == "__main__":
-    # Run test if executed directly
     asyncio.run(test_service()) 
