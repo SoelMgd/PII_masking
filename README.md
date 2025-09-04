@@ -249,7 +249,6 @@ class MistralPromptingService(BasePIIInferenceService):
 ### Environment Variables
 ```bash
 MISTRAL_API_KEY=your_api_key_here
-MISTRAL_MODEL=mistral-large-latest
 LOG_LEVEL=INFO
 ```
 
