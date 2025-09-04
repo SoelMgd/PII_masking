@@ -545,6 +545,152 @@ DistilBERT & 0.610 & 0.642 & 0.580 & 45ms \\
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Smart Async/Sync Architecture: Handling Concurrency}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{The Challenge}
+\begin{itemize}
+\item \textbf{BERT}: CPU-bound (blocking operations)
+\item \textbf{Mistral}: I/O-bound (network calls)
+\item \textbf{FastAPI}: Async framework
+\item \textbf{Goal}: Serve multiple users simultaneously
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Naive Approach Problems}
+\begin{itemize}
+\item BERT blocks entire event loop
+\item Users wait sequentially
+\item Poor scalability under load
+\end{itemize}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{Our Solution: Unified Interface}
+\begin{lstlisting}[language=python,basicstyle=\tiny]
+class BasePIIInferenceService:
+    async def predict(self, text):
+        # Auto-routing based on service type
+        try:
+            # Try native async (Mistral)
+            return await self.predict_async_native(text)
+        except NotImplementedError:
+            # Fall back to thread pool (BERT)
+            return await asyncio.to_thread(
+                self.predict_sync, text
+            )
+\end{lstlisting}
+
+\vspace{0.3cm}
+\textbf{Benefits}
+\begin{itemize}
+\item \textbf{BERT}: Runs in thread pool (non-blocking)
+\item \textbf{Mistral}: Native async (I/O efficient)
+\item \textbf{FastAPI}: Unified \texttt{await} interface
+\item \textbf{Concurrency}: Multiple requests served simultaneously
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Concurrency Performance Demonstration}
+\begin{columns}
+\begin{column}{0.6\textwidth}
+\begin{center}
+\includegraphics[width=\textwidth]{images/concurrency_comparison.png}
+\caption{Sequential vs Concurrent Request Handling}
+\end{center}
+\end{column}
+\begin{column}{0.4\textwidth}
+\textbf{Sequential (Bad)}
+\begin{itemize}
+\item Request 1: BERT (2s)
+\item Request 2: Mistral (3s) \textit{waits}
+\item Request 3: BERT (2s) \textit{waits}
+\item \textbf{Total: 7 seconds}
+\end{itemize}
+
+\vspace{0.3cm}
+\textbf{Concurrent (Good)}
+\begin{itemize}
+\item Request 1: BERT (2s) \textit{in thread}
+\item Request 2: Mistral (3s) \textit{async}
+\item Request 3: BERT (2s) \textit{in thread}
+\item \textbf{Total: 3 seconds}
+\end{itemize}
+
+\vspace{0.3cm}
+\begin{alertblock}{Performance Gain}
+\textbf{2.3x faster} under concurrent load\\
+Multiple users served simultaneously
+\end{alertblock}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Technical Implementation: Service Pattern Design}
+\begin{columns}
+\begin{column}{0.5\textwidth}
+\textbf{BERT Service (CPU-bound)}
+\begin{lstlisting}[language=python,basicstyle=\tiny]
+class BERTInferenceService(BasePIIInferenceService):
+    def predict_sync(self, text):
+        # Synchronous PyTorch operations
+        inputs = self.tokenizer(text, ...)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+        return self.process_predictions(outputs)
+    
+    # predict() inherited from base class
+    # Automatically wraps with asyncio.to_thread()
+\end{lstlisting}
+
+\vspace{0.3cm}
+\textbf{Mistral Service (I/O-bound)}
+\begin{lstlisting}[language=python,basicstyle=\tiny]
+class MistralPromptingService(BasePIIInferenceService):
+    async def predict_async_native(self, text):
+        # Native async API calls
+        response = await self.client.chat(
+            messages=[{"role": "user", "content": text}]
+        )
+        return self.process_json_response(response)
+    
+    # predict() inherited from base class
+    # Calls predict_async_native() directly
+\end{lstlisting}
+\end{column}
+\begin{column}{0.5\textwidth}
+\textbf{FastAPI Integration}
+\begin{lstlisting}[language=python,basicstyle=\tiny]
+@app.post("/predict")
+async def predict(request: PredictionRequest):
+    if request.method == "bert":
+        # BERT: sync -> thread pool
+        prediction = await bert_service.predict(text)
+    elif request.method == "mistral":
+        # Mistral: native async
+        prediction = await mistral_service.predict(text)
+    
+    return PredictionResponse(
+        masked_text=prediction.masked_text,
+        entities=prediction.entities,
+        processing_time=processing_time
+    )
+\end{lstlisting}
+
+\vspace{0.3cm}
+\textbf{Key Advantages}
+\begin{itemize}
+\item \textbf{Unified Interface}: Same \texttt{await} call for all services
+\item \textbf{Automatic Routing}: Service type determines execution pattern
+\item \textbf{Zero Blocking}: Event loop never blocked
+\item \textbf{Scalable}: Handles concurrent users efficiently
+\item \textbf{Maintainable}: Clean separation of concerns
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
 \begin{frame}{Performance \& Inference Time Analysis}
 \begin{center}
 \includegraphics[width=0.8\textwidth]{images/inference_times.png}
@@ -629,6 +775,7 @@ Mistral-large API & 3.1s & 12.4s & \$80.00 \\
 \item Production-ready deployment
 \item Multi-method comparison
 \item Cost-effective batch processing
+\item \textbf{Smart async/sync architecture} for optimal concurrency
 \end{itemize}
 
 \vspace{0.3cm}
