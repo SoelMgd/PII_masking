@@ -50,7 +50,6 @@ class PIIExample:
         spans = []
         for span in self.span_labels:
             if len(span) >= 3 and span[2] != 'O':
-                # Remove B- or I- prefix if present
                 entity_type = span[2].replace('B-', '').replace('I-', '')
                 spans.append({
                     'start': span[0],
@@ -61,9 +60,7 @@ class PIIExample:
         return spans
 
 class PIIDataLoader:
-    """
-    Handles loading and preprocessing of PII datasets.
-    """
+    """Handles loading and preprocessing of PII datasets."""
     
     def __init__(self, data_dir: Union[str, Path] = "data"):
         """
@@ -96,7 +93,6 @@ class PIIDataLoader:
             raise ValueError(f"Language '{language}' not supported. "
                            f"Available: {self.supported_languages}")
         
-        # Find dataset file
         dataset_file = self._find_dataset_file(language)
         if not dataset_file.exists():
             raise FileNotFoundError(f"Dataset file not found: {dataset_file}")
@@ -128,7 +124,6 @@ class PIIDataLoader:
     
     def _find_dataset_file(self, language: str) -> Path:
         """Find the dataset file for a given language."""
-        # Try different naming patterns
         patterns = [
             f"{language}_pii_*.jsonl",
             f"{language}_*.jsonl",
@@ -138,9 +133,8 @@ class PIIDataLoader:
         for pattern in patterns:
             files = list(self.data_dir.glob(pattern))
             if files:
-                return files[0]  # Return first match
+                return files[0]
         
-        # Fallback to exact name
         return self.data_dir / f"{language}_pii_43k.jsonl"
     
     def _parse_line(self, line: str) -> Optional[PIIExample]:
@@ -151,7 +145,6 @@ class PIIDataLoader:
         try:
             data = json.loads(line)
             
-            # Parse privacy_mask (stored as string)
             privacy_mask = {}
             if data.get('privacy_mask'):
                 try:
@@ -159,7 +152,6 @@ class PIIDataLoader:
                 except:
                     privacy_mask = {}
             
-            # Parse span_labels (stored as string)
             span_labels = []
             if data.get('span_labels'):
                 try:
@@ -196,31 +188,30 @@ class PIIDataLoader:
         if not examples:
             return {}
         
-        # Count entity types
         entity_counts = {}
         total_entities = 0
         text_lengths = []
         
         for example in examples:
-            text_lengths.append(len(example.unmasked_text))
-            
-            for entity_type in example.get_entity_types():
+            entity_types = example.get_entity_types()
+            for entity_type in entity_types:
                 entity_counts[entity_type] = entity_counts.get(entity_type, 0) + 1
                 total_entities += 1
+            
+            text_lengths.append(len(example.unmasked_text))
         
         return {
             'total_examples': len(examples),
             'total_entities': total_entities,
             'unique_entity_types': len(entity_counts),
             'entity_type_counts': entity_counts,
-            'avg_text_length': sum(text_lengths) / len(text_lengths),
-            'min_text_length': min(text_lengths),
-            'max_text_length': max(text_lengths)
+            'avg_text_length': sum(text_lengths) / len(text_lengths) if text_lengths else 0,
+            'max_text_length': max(text_lengths) if text_lengths else 0,
+            'min_text_length': min(text_lengths) if text_lengths else 0
         }
     
-    def split_dataset(self, 
-                     examples: List[PIIExample],
-                     train_ratio: float = 0.8,
+    def split_dataset(self, examples: List[PIIExample], 
+                     train_ratio: float = 0.8, 
                      val_ratio: float = 0.1,
                      test_ratio: float = 0.1,
                      seed: int = 42) -> Dict[str, List[PIIExample]]:
@@ -232,26 +223,31 @@ class PIIDataLoader:
             train_ratio: Proportion for training set
             val_ratio: Proportion for validation set  
             test_ratio: Proportion for test set
-            seed: Random seed for splitting
+            seed: Random seed for reproducible splits
             
         Returns:
             Dictionary with 'train', 'val', 'test' keys
         """
-        import random
-        
         if abs(train_ratio + val_ratio + test_ratio - 1.0) > 1e-6:
             raise ValueError("Split ratios must sum to 1.0")
         
+        import random
         random.seed(seed)
-        shuffled = examples.copy()
-        random.shuffle(shuffled)
         
-        n = len(shuffled)
-        train_end = int(n * train_ratio)
-        val_end = train_end + int(n * val_ratio)
+        shuffled_examples = examples.copy()
+        random.shuffle(shuffled_examples)
         
-        return {
-            'train': shuffled[:train_end],
-            'val': shuffled[train_end:val_end],
-            'test': shuffled[val_end:]
+        n_total = len(shuffled_examples)
+        n_train = int(n_total * train_ratio)
+        n_val = int(n_total * val_ratio)
+        
+        splits = {
+            'train': shuffled_examples[:n_train],
+            'val': shuffled_examples[n_train:n_train + n_val],
+            'test': shuffled_examples[n_train + n_val:]
         }
+        
+        logger.info(f"Dataset split - Train: {len(splits['train'])}, "
+                   f"Val: {len(splits['val'])}, Test: {len(splits['test'])}")
+        
+        return splits

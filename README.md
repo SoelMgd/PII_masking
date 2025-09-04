@@ -1,6 +1,6 @@
 # PII Masking Evaluation Framework
 
-**Mistral AI Take-Home Project** 
+**Mistral Take-Home Project** 
 
 A comprehensive framework for evaluating and comparing PII (Personally Identifiable Information) masking approaches using various LLM techniques including prompting and fine-tuning.
 
@@ -11,8 +11,8 @@ A comprehensive framework for evaluating and comparing PII (Personally Identifia
 
 This project evaluates whether **prompt engineering** can compete with **fine-tuned models** and token-classiciation approach for PII masking tasks, enabling data-driven decisions about the optimal approach.
 
-### Dataset: AI4Privacy PII-200k
-- **48k examples**
+### Dataset: AI4Privacy PII
+- **48k english and 64k french examples**
 - **54 PII classes** covering comprehensive privacy scenarios
 - **Human-validated** synthetic data with no privacy violations
 
@@ -67,10 +67,10 @@ pii-masking-200k/
 
 ### Repository Components
 
-#### 🔬 **Research & Development** (`src/` + `experiments/`)
+#### **Research & Development** (`src/` + `experiments/`)
 - **Core framework**: Reusable PII detection and evaluation components
 - **Experiments**: Comparative studies between prompting, fine-tuning, and token classification
-- **Benchmarking**: Systematic evaluation on AI4Privacy PII-200k dataset
+- **Benchmarking**: Systematic evaluation on AI4Privacy PII dataset
 
 #### **Production Deployment** (`space/`)
 - **Web application**: FastAPI server with modern frontend
@@ -122,6 +122,7 @@ All experiments return `EvaluationResult` objects with:
 - **Approach**: Sophisticated prompt engineering + few-shot learning
 - **Models**: mistral-large-latest, fine-tuned models
 - **Features**: Rate limiting, retry logic, batch processing, configurable prompts
+- **Languages**: English & french
 
 ```bash
 cd experiments
@@ -137,11 +138,13 @@ uv run mistral_prompting_baseline.py \
 - **Approach**: Fine-tuned Mistral models via API
 - **Features**: Custom model training, specialized PII detection
 - **Performance**: Enhanced accuracy on domain-specific patterns
+- **Languages**: English & french
 
 ### 3. BERT Token Classification (`bert_test.py`)
 - **Approach**: Fine-tuned BERT for token-level PII detection
 - **Models**: DistilBERT, BERT-base optimized for CPU inference
 - **Features**: Fast inference, offline deployment capability
+- **Languages**: English only
 
 ### 4. Cross-Method Evaluation (`evaluation_comparison.py`)
 - **Comprehensive comparison** across all three approaches

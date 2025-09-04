@@ -54,13 +54,8 @@ class PIIPrediction:
         Returns:
             Complete PIIPrediction with all fields populated
         """
-        # Parse JSON to get entities
         entities = parse_json_prediction(json_str)
-        
-        # Compute spans from entities and text
         spans = json_to_spans(original_text, entities)
-        
-        # Reconstruct masked text
         masked_text = reconstruct_masked_text(original_text, entities)
         
         return cls(
@@ -115,14 +110,11 @@ def parse_json_prediction(prediction: str) -> Dict[str, List[str]]:
         Dictionary with entity types as keys and lists of substrings as values
     """
     try:
-        # Parse JSON directly (should be valid due to JSON mode)
         parsed = json.loads(prediction.strip())
         
-        # Extract PII dictionary
         if 'PII' in parsed:
             return parsed['PII']
         else:
-            # If the model returns the entities directly without "PII" wrapper
             return parsed
             
     except Exception as e:
@@ -148,10 +140,8 @@ def json_to_spans(text: str, pii_dict: Dict[str, List[str]]) -> List[EntitySpan]
             if not substring or not isinstance(substring, str):
                 continue
             
-            # Escape special regex characters in the substring
             escaped_substring = re.escape(substring)
             
-            # Find all occurrences of this substring in the text
             for match in re.finditer(escaped_substring, text):
                 span = EntitySpan(
                     entity_type=entity_type,
@@ -161,7 +151,6 @@ def json_to_spans(text: str, pii_dict: Dict[str, List[str]]) -> List[EntitySpan]
                 )
                 spans.append(span)
     
-    # Sort spans by start position
     spans.sort(key=lambda x: x.start)
     
     return spans
@@ -179,34 +168,28 @@ def reconstruct_masked_text(text: str, pii_dict: Dict[str, List[str]]) -> str:
     """
     masked_text = text
     
-    # Get all spans and sort by position (normal order for numbering)
     all_spans = json_to_spans(text, pii_dict)
     all_spans.sort(key=lambda x: x.start)
     
-    # First pass: assign numbers to spans in order of appearance
     entity_counters = defaultdict(int)
     span_numbers = {}
     
     for i, span in enumerate(all_spans):
         entity_counters[span.entity_type] += 1
-        # Create a unique key for this span
         span_key = (span.start, span.end, span.entity_type)
         span_numbers[span_key] = entity_counters[span.entity_type]
     
-    # Second pass: replace spans in reverse order to maintain text positions
     all_spans.sort(key=lambda x: x.start, reverse=True)
     
     for span in all_spans:
         span_key = (span.start, span.end, span.entity_type)
         number = span_numbers[span_key]
         placeholder = f"[{span.entity_type}_{number}]"
-        # Replace the span in the text
         masked_text = masked_text[:span.start] + placeholder + masked_text[span.end:]
     
     return masked_text
 
 
-# To remove if no longer used
 def reconstruct_masked_text_from_prediction(text: str, prediction: Union[str, Any]) -> str:
     """
     Reconstruct masked text from a prediction (JSON string or PIIPrediction object).
@@ -221,7 +204,6 @@ def reconstruct_masked_text_from_prediction(text: str, prediction: Union[str, An
     if isinstance(prediction, str):
         pii_dict = parse_json_prediction(prediction)
     else:
-        # Assume it's a PIIPrediction object with .entities attribute
         pii_dict = prediction.entities
         
     return reconstruct_masked_text(text, pii_dict) 

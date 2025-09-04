@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 FastAPI application for PII Masking Demo - HuggingFace Space.
-
-Simple version using only Mistral Prompting service.
 """
 
 import os
@@ -16,12 +14,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-# Import our inference services
 from services.mistral_prompting import create_mistral_service, MistralPromptingService
 from services.bert_classif import create_bert_service, BERTInferenceService
 from services.ocr_service import create_ocr_service, OCRService
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -34,13 +30,11 @@ mistral_finetuned_service: MistralPromptingService = None
 bert_service: BERTInferenceService = None
 ocr_service: OCRService = None
 
-# Model configurations
 MODELS = {
     "base": "mistral-large-latest",
     "finetuned": "ft:ministral-8b-latest:c6d4dfa8:20250831:pii-1e-4-200:57d93df9"
 }
 
-# BERT model path - HuggingFace Hub repository
 BERT_MODEL_PATH = "SoelMgd/bert-pii-detection"
 
 @asynccontextmanager
@@ -48,58 +42,47 @@ async def lifespan(app: FastAPI):
     """Manage application lifespan - startup and shutdown."""
     global mistral_base_service, mistral_finetuned_service, bert_service, ocr_service
     
-    # Startup
     logger.info("Starting PII Masking Demo application...")
     
     try:
-        # Initialize base Mistral service
         logger.info("Initializing base Mistral service...")
         mistral_base_service = await create_mistral_service(model_name=MODELS["base"])
         logger.info("Base Mistral service initialized successfully")
         
-        # Initialize fine-tuned Mistral service
         logger.info("Initializing fine-tuned Mistral service...")
         mistral_finetuned_service = await create_mistral_service(model_name=MODELS["finetuned"])
         logger.info("Fine-tuned Mistral service initialized successfully")
         
     except Exception as e:
         logger.error(f"Failed to initialize Mistral services: {e}")
-        # Don't raise exception - let app start but handle gracefully in endpoints
     
     try:
-        # Initialize BERT service
         logger.info("Initializing BERT service...")
         bert_service = await create_bert_service(model_path=BERT_MODEL_PATH)
         logger.info("BERT service initialized successfully")
         
     except Exception as e:
         logger.error(f"Failed to initialize BERT service: {e}")
-        # Don't raise exception - let app start but handle gracefully in endpoints
     
     try:
-        # Initialize OCR service
         logger.info("Initializing OCR service...")
         ocr_service = await create_ocr_service()
         logger.info("OCR service initialized successfully")
         
     except Exception as e:
         logger.error(f"Failed to initialize OCR service: {e}")
-        # Don't raise exception - let app start but handle gracefully in endpoints
         
     yield
     
-    # Shutdown
     logger.info("Shutting down application...")
 
-# Create FastAPI app
 app = FastAPI(
-    title="🔒 PII Masking Demo",
+    title="PII Masking Demo",
     description="Personal Identifiable Information masking using Mistral AI",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# Request/Response models
 class PredictionRequest(BaseModel):
     text: str = Field(..., description="Text to analyze for PII", min_length=1, max_length=5000)
     method: str = Field(default="mistral", description="Method to use: 'mistral' or 'bert'")
@@ -119,7 +102,6 @@ class HealthResponse(BaseModel):
     services: Dict[str, Any]
     timestamp: float
 
-# Helper function to get the appropriate service
 def get_mistral_service(model: str) -> MistralPromptingService:
     """Get the appropriate Mistral service based on model type."""
     if model == "base":
@@ -142,7 +124,6 @@ def get_mistral_service(model: str) -> MistralPromptingService:
             detail=f"Model '{model}' not supported. Use 'base' or 'finetuned'."
         )
 
-# Mount static files for frontend
 try:
     app.mount("/static", StaticFiles(directory="static"), name="static")
 except Exception as e:
@@ -154,7 +135,6 @@ async def root():
     try:
         return FileResponse("static/index.html")
     except Exception:
-        # Fallback HTML if static files not available
         return HTMLResponse("""
         <!DOCTYPE html>
         <html>
@@ -221,12 +201,7 @@ async def root():
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
-    """
-    Predict PII entities and return masked text.
-    
-    Supports Mistral models (base and fine-tuned) and BERT.
-    """
-    # Validate method
+    """Predict PII entities and return masked text."""
     if request.method not in ["mistral", "bert"]:
         raise HTTPException(
             status_code=400, 
@@ -237,32 +212,26 @@ async def predict(request: PredictionRequest):
     
     try:
         if request.method == "mistral":
-            # Get the appropriate Mistral service
             service = get_mistral_service(request.model)
             model_type = "Fine-tuned" if request.model == "finetuned" else "Base"
-            logger.info(f"🔍 Processing text with {model_type} Mistral model: {request.text[:100]}...")
+            logger.info(f"Processing text with {model_type} Mistral model: {request.text[:100]}...")
             
-            # Call Mistral service
             prediction = await service.predict(request.text, request.pii_entities)
             method_used = f"{request.method}-{request.model}"
             
         elif request.method == "bert":
-            # Check BERT service availability
             if bert_service is None:
                 raise HTTPException(
                     status_code=503, 
                     detail="BERT service not available. Please check model configuration."
                 )
             
-            logger.info(f"🔍 Processing text with BERT model: {request.text[:100]}...")
+            logger.info(f"Processing text with BERT model: {request.text[:100]}...")
             
-            # Call BERT service
             prediction = await bert_service.predict(request.text, request.pii_entities)
             method_used = "bert"
         
         processing_time = time.time() - start_time
-        
-        # Count total entities
         num_entities = sum(len(entities) for entities in prediction.entities.values())
         
         logger.info(f"Prediction completed in {processing_time:.3f}s - found {num_entities} entities")
@@ -290,26 +259,19 @@ async def predict_pdf(
     model: str = "base",
     pii_entities: str = "[]"
 ):
-    """
-    Extract text from PDF using OCR, then predict PII entities and return masked text.
-    
-    Supports the same methods as /predict: Mistral (base/fine-tuned) and BERT.
-    """
-    # Validate file type
+    """Extract text from PDF using OCR, then predict PII entities."""
     if not file.filename.lower().endswith('.pdf'):
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are supported"
         )
     
-    # Check OCR service availability
     if ocr_service is None:
         raise HTTPException(
             status_code=503,
             detail="OCR service not available. Please check API key configuration."
         )
     
-    # Validate method
     if method not in ["mistral", "bert"]:
         raise HTTPException(
             status_code=400, 
@@ -317,17 +279,14 @@ async def predict_pdf(
         )
     
     try:
-        # Parse PII entities list
         import json
         pii_entities_list = json.loads(pii_entities) if pii_entities else []
         
         start_time = time.time()
         
-        # Read PDF content
         pdf_content = await file.read()
         logger.info(f"Received PDF file: {file.filename} ({len(pdf_content)} bytes)")
         
-        # Extract text using OCR
         logger.info("Extracting text from PDF using Mistral OCR...")
         extracted_text = await ocr_service.extract_text_from_pdf(pdf_content)
         
@@ -339,15 +298,12 @@ async def predict_pdf(
         
         logger.info(f"Extracted {len(extracted_text)} characters from PDF")
         
-        # Now process the extracted text with the selected method
         if method == "mistral":
-            # Get the appropriate Mistral service
             service = get_mistral_service(model)
             prediction = await service.predict(extracted_text, pii_entities_list)
             method_used = f"{method}-{model}"
             
         elif method == "bert":
-            # Check BERT service availability
             if bert_service is None:
                 raise HTTPException(
                     status_code=503, 
@@ -358,8 +314,6 @@ async def predict_pdf(
             method_used = "bert"
         
         processing_time = time.time() - start_time
-        
-        # Count total entities
         num_entities = sum(len(entities) for entities in prediction.entities.values())
         
         logger.info(f"PDF processing completed in {processing_time:.3f}s - found {num_entities} entities")
@@ -414,7 +368,6 @@ async def health_check():
         }
     }
     
-    # Overall status
     base_healthy = mistral_base_service and mistral_base_service.is_initialized
     finetuned_healthy = mistral_finetuned_service and mistral_finetuned_service.is_initialized
     bert_healthy = bert_service and bert_service.is_initialized
@@ -464,7 +417,6 @@ async def api_info():
         }
     }
 
-# Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request: Request, exc):
     return JSONResponse(
@@ -480,7 +432,6 @@ async def internal_error_handler(request: Request, exc):
         content={"detail": "Internal server error"}
     )
 
-# Add CORS middleware for development
 from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
@@ -494,7 +445,6 @@ app.add_middleware(
 if __name__ == "__main__":
     import uvicorn
     
-    # For local development
     uvicorn.run(
         "app:app",
         host="0.0.0.0",

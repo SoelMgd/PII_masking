@@ -11,26 +11,16 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 from mistralai import Mistral
 
-# Setup logging
 logger = logging.getLogger(__name__)
 
 class OCRService:
-    """
-    OCR service for extracting text from PDF documents using Mistral OCR API.
-    """
+    """OCR service for extracting text from PDF documents using Mistral OCR API."""
     
     def __init__(self, api_key: Optional[str] = None):
-        """
-        Initialize the OCR service.
-        
-        Args:
-            api_key: Mistral API key (if None, will read from environment)
-        """
         self.api_key = api_key or os.environ.get("MISTRAL_API_KEY")
         if not self.api_key:
             raise ValueError("MISTRAL_API_KEY not found in environment variables")
@@ -41,34 +31,23 @@ class OCRService:
         logger.info("OCR service initialized with Mistral API")
     
     async def extract_text_from_pdf(self, pdf_content: bytes) -> str:
-        """
-        Extract text from PDF content using Mistral OCR.
-        
-        Args:
-            pdf_content: Raw PDF file content as bytes
-            
-        Returns:
-            Extracted text content
-        """
+        """Extract text from PDF content using Mistral OCR."""
         try:
-            # Encode PDF content to base64
             base64_pdf = base64.b64encode(pdf_content).decode('utf-8')
             
             logger.info(f"Processing PDF ({len(pdf_content)} bytes) with Mistral OCR...")
             
-            # Process the PDF with OCR
             ocr_response = self.client.ocr.process(
                 model="mistral-ocr-latest",
                 document={
                     "type": "document_url",
                     "document_url": f"data:application/pdf;base64,{base64_pdf}"
                 },
-                include_image_base64=False  # Don't include images to save bandwidth
+                include_image_base64=False
             )
             
             logger.info("OCR processing completed")
             
-            # Extract text from all pages
             extracted_text = ""
             
             if hasattr(ocr_response, 'pages') and ocr_response.pages:
@@ -99,28 +78,37 @@ class OCRService:
     def get_service_info(self) -> Dict[str, Any]:
         """Get service information for monitoring."""
         return {
-            "service_name": "OCRService",
-            "is_initialized": self.is_initialized,
-            "api_provider": "Mistral",
+            "service_type": "ocr",
             "model": "mistral-ocr-latest",
-            "description": "PDF text extraction using Mistral OCR API"
+            "initialized": self.is_initialized,
+            "description": "Mistral OCR service for PDF text extraction"
         }
 
-# Factory function for easy initialization
 async def create_ocr_service(api_key: Optional[str] = None) -> OCRService:
-    """
-    Factory function to create and initialize OCR service.
-    
-    Args:
-        api_key: Mistral API key (if None, will read from environment)
-        
-    Returns:
-        Initialized OCRService
-    """
+    """Factory function to create OCR service."""
     try:
         service = OCRService(api_key)
-        logger.info("OCR service created successfully")
         return service
     except Exception as e:
         logger.error(f"Failed to create OCR service: {e}")
-        raise 
+        raise
+
+async def test_ocr_service():
+    """Test function for development."""
+    try:
+        service = await create_ocr_service()
+        logger.info("OCR service test - service created successfully")
+        
+        with open("test.pdf", "rb") as f:
+            pdf_content = f.read()
+            
+        text = await service.extract_text_from_pdf(pdf_content)
+        logger.info(f"Extracted text length: {len(text)}")
+        logger.info(f"First 200 chars: {text[:200]}")
+        
+    except Exception as e:
+        logger.error(f"OCR test failed: {e}")
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(test_ocr_service()) 

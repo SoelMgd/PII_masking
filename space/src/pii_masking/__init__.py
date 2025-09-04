@@ -6,7 +6,7 @@ using various LLM techniques including prompting and fine-tuning.
 """
 
 __version__ = "0.1.0"
-__author__ = "Applied AI Engineer Candidate"
+__author__ = "SoelM"
 
 from .data_loader import PIIDataLoader, PIIExample
 from .base_model import (
