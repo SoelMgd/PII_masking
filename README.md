@@ -19,59 +19,39 @@ This project evaluates whether **prompt engineering** can compete with **fine-tu
 ## Project Structure
 
 ```
-pii-masking-200k/
+pii-masking/
 ├── src/pii_masking/           # Core framework package
-│   ├── __init__.py               # Package exports
-│   ├── data_loader.py            # Dataset loading utilities
-│   ├── text_processing.py       # Text processing and reconstruction
-│   ├── custom_evaluator.py      # Evaluation with exact position matching
-│   └── base_model.py             # Abstract model interfaces
+│   ├── data_loader.py
+│   ├── text_processing.py
+│   ├── custom_evaluator.py
+│   └── base_model.py
 │
 ├── experiments/               # Research experiments & analysis
-│   ├── mistral_prompting_baseline.py    # Mistral API prompting
-│   ├── mistral_finetuning.py           # Mistral fine-tuning experiments
-│   ├── bert_token_classification/      # BERT experiments
-│   │   ├── bert_finetuning_kaggle.ipynb # BERT training notebook
-│   │   └── eval.py                      # BERT evaluation script
-│   ├── llm_token_classification/       # LLM Token Classification experiments
-│   │   ├── dataset_processing_token.py  # Dataset preprocessing for token classification
-│   │   ├── mistral-token-classif.ipynb  # Mistral fine-tuning notebook (Kaggle)
-│   │   └── eval.py                      # Mistral token classification evaluation
-│   ├── performance_benchmarks/         # Production performance validation
-│   │   ├── services_setup.py           # Service initialization for benchmarking
-│   │   ├── speed_benchmark.py           # Inference speed & throughput testing
-│   │   ├── concurrency_benchmark.py    # Async/sync architecture validation
-│   │   └── results/                     # Benchmark results & reports
-│   ├── visualization/               # Results visualization
-│   │   └── results_visualization.py    # Performance charts & comparisons
-│   └── evaluation_comparison.py        # Cross-method comparison
+│   ├── mistral_prompting_baseline.py
+│   ├── mistral_finetuning.py
+│   ├── bert_token_classification/
+│   │   ├── bert_finetuning_kaggle.ipynb
+│   │   └── eval.py
+│   ├── llm_token_classification/
+│   │   ├── dataset_processing_token.py
+│   │   ├── mistral-token-classif.ipynb
+│   │   └── eval.py
+│   ├── performance_benchmarks/    # Production performance validation
+│   │   ├── speed_benchmark.py
+│   │   ├── concurrency_benchmark.py
+│   │   └── results/
+│   └── visualization/
 │
-├── space/                     # Production deployment (HuggingFace Space)
-│   ├── app.py                    # FastAPI production server with async/sync architecture
-│   ├── services/                 # Smart inference services (refactored)
-│   │   ├── base_service.py       # Unified async/sync interface
-│   │   ├── mistral_prompting.py  # Mistral API service (native async)
-│   │   ├── bert_classif.py       # BERT inference service (sync + thread pool)
-│   │   └── ocr_service.py        # PDF OCR processing (Mistral OCR)
-│   ├── static/                   # Frontend assets
-│   │   └── index.html            # Web interface with PDF drag-and-drop
-│   ├── src/                      # Shared core package (symlink)
-│   ├── pyproject.toml           # Space dependencies
-│   ├── Dockerfile               # Container configuration
-│   └── README.md                # Space deployment guide
+├── space/                     # Production deployment
+│   ├── app.py                 # FastAPI server with async/sync architecture
+│   ├── services/              # Inference services
+│   │   ├── base_service.py    # Unified async/sync interface
+│   │   ├── mistral_prompting.py
+│   │   ├── bert_classif.py
+│   │   └── ocr_service.py
+│   └── static/
 │
-├── models/                    # Trained model artifacts
-│   ├── bert_classic_token_classif/     # BERT Classic fine-tuned model
-│   └── bert_token_classif/             # DistilBERT fine-tuned model
-│
-├── data/                      # Dataset files (AI4Privacy PII-200k)
-├── configs/                  # Configuration files
-├── results/                   # Experiment results & visualizations
-│
-├── presentation.tex           # LaTeX presentation (Mistral AI take-home)
-├── pyproject.toml             # Project configuration
-├── .env.example               # Environment variables template
-└── README.md                  # This file
+└── presentation.pdf           # Presentation
 ```
 
 ### Repository Components
@@ -273,8 +253,6 @@ MISTRAL_MODEL=mistral-large-latest
 LOG_LEVEL=INFO
 ```
 
-
-
 ## Results Analysis
 
 ### JSON Output Format
@@ -308,7 +286,6 @@ LOG_LEVEL=INFO
 - **Multi-language** support for global deployment
 
 ### Cost-Benefit Analysis
-- **API Approach**: ~$0.05-0.15 per prediction, immediate deployment
-- **Fine-tuning**: ~$50-100 initial cost, 2-3 days development
-- **Break-even**: ~1000 predictions/month
+- **Costs reduction**
+- **Faster PII masking time**
 
