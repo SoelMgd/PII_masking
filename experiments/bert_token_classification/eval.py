@@ -488,9 +488,9 @@ def main():
     print("BERT Classic PII Token Classification - Entity-Level Evaluation")
     print("="*60)
     
-    model_path = "/Users/twin/Documents/pii-masking-200k/models/bert_classic_token_classif"
-    data_path = "/Users/twin/Documents/pii-masking-200k/data/processed_data_bert"
-    results_path = "/Users/twin/Documents/pii-masking-200k/results"
+    model_path = "./models/bert_classic_token_classif"
+    data_path = "./data/processed_data_bert"
+    results_path = "./results"
     
     if not Path(model_path).exists():
         print(f"Model not found at {model_path}")
@@ -501,7 +501,7 @@ def main():
     
     if not Path(data_path).exists():
         print(f"Data not found at {data_path}")
-        print("💡 Please ensure the processed BERT data exists")
+        print("Please ensure the processed BERT data exists")
         return
     
     try:
