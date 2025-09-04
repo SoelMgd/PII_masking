@@ -9,7 +9,7 @@ A comprehensive framework for evaluating and comparing PII (Personally Identifia
 
 ## Project Overview
 
-This project evaluates whether **prompt engineering** can compete with **fine-tuned models** and token-classiciation approach for PII masking tasks, enabling data-driven decisions about the optimal approach.
+This project evaluates whether **prompt engineering** can compete with **fine-tuned models** and **token-classiciation** approach for PII masking tasks, enabling data-driven decisions about the optimal approach.
 
 ### Dataset: AI4Privacy PII
 - **48k english and 64k french examples**
@@ -33,6 +33,15 @@ pii-masking-200k/
 │   ├── bert_token_classification/      # BERT experiments
 │   │   ├── bert_finetuning_kaggle.ipynb # BERT training notebook
 │   │   └── eval.py                      # BERT evaluation script
+│   ├── llm_token_classification/       # LLM Token Classification experiments
+│   │   ├── dataset_processing_token.py  # Dataset preprocessing for token classification
+│   │   ├── mistral-token-classif.ipynb  # Mistral fine-tuning notebook (Kaggle)
+│   │   └── eval.py                      # Mistral token classification evaluation
+│   ├── performance_benchmarks/         # Production performance validation
+│   │   ├── services_setup.py           # Service initialization for benchmarking
+│   │   ├── speed_benchmark.py           # Inference speed & throughput testing
+│   │   ├── concurrency_benchmark.py    # Async/sync architecture validation
+│   │   └── results/                     # Benchmark results & reports
 │   ├── visualization/               # Results visualization
 │   │   └── results_visualization.py    # Performance charts & comparisons
 │   └── evaluation_comparison.py        # Cross-method comparison
@@ -80,7 +89,7 @@ pii-masking-200k/
 
 ## Quick Start
 
-### 1. Installation (avec UV - recommandé)
+### 1. Installation (avec UV - recommended)
 
 ```bash
 # Clone and navigate to project
@@ -146,10 +155,43 @@ uv run mistral_prompting_baseline.py \
 - **Features**: Fast inference, offline deployment capability
 - **Languages**: English only
 
-### 4. Cross-Method Evaluation (`evaluation_comparison.py`)
+### 4. Mistral Token Classification (`llm_token_classification/`)
+- **Approach**: Fine-tuned Mistral-8B for token-level PII detection
+- **Models**: Ministral-8B-Instruct-2410 with frozen backbone + classification head
+- **Languages**: English only
+
+```bash
+cd experiments/llm_token_classification
+
+# Process dataset for token classification
+uv run dataset_processing_token.py \
+    --data-dir ../../data \
+    --output-dir ./data \
+    --max-english 30000
+
+# Evaluate trained model (entity-level metrics)
+uv run eval.py \
+    --model-path ./ministral_token_classifier \
+    --val-dataset ./data/val_dataset.pkl \
+    --output-file ./evaluation_results.json
+```
+
+### 5. Cross-Method Evaluation (`evaluation_comparison.py`)
 - **Comprehensive comparison** across all three approaches
 - **Performance metrics**: Precision, Recall, F1-Score by entity type
 - **Cost analysis**: API costs vs. fine-tuning investment
+
+### 6. Performance Benchmarks (`performance_benchmarks/`)
+- **Speed benchmarking**: Inference time & throughput testing across different text lengths
+- **Concurrency validation**: Sequential vs concurrent processing comparison
+
+```bash
+cd experiments/performance_benchmarks
+
+# Run comprehensive performance benchmarks
+python speed_benchmark.py
+python concurrency_benchmark.py 
+```
 
 
 ## Production Deployment (HuggingFace Space)
@@ -190,7 +232,7 @@ Different AI services have different computational characteristics:
 - **Mistral API**: I/O-bound operations (network calls) - naturally asynchronous
 - **FastAPI**: Async framework requiring non-blocking operations
 
-### Our Solution: Unified Interface with Automatic Routing
+### The solution: Unified Interface with Automatic Routing
 
 ```python
 class BasePIIInferenceService(ABC):
@@ -218,29 +260,11 @@ class MistralPromptingService(BasePIIInferenceService):
 ```
 
 ### Performance Benefits
-- **2.3x faster** under concurrent load
-- **Non-blocking**: BERT inference doesn't block Mistral API calls
-- **Scalable**: Multiple users served simultaneously
+- **6.0x faster** BERT inference under concurrent load
+- **Scalable**: Multiple users served simultaneously (22.1 req/s vs 3.7 req/s)
 - **Maintainable**: Clean separation of sync/async concerns
+- **Production-validated**: Real performance metrics from comprehensive benchmarks
 
-### Adding New Experiments
-
-1. **Inherit from base classes**:
-   ```python
-   from pii_masking.base_model import PromptBasedModel
-   ```
-
-2. **Use standard evaluation**:
-   ```python
-   from pii_masking import PIIEvaluator, EvaluationResult
-   
-   evaluator = PIIEvaluator(strict_matching=True)
-   result = evaluator.evaluate_dataset(examples, predictions, ...)
-   ```
-
-3. **Follow naming convention**: `{model_type}_{approach}.py`
-
-## 📋 Configuration
 
 ### Environment Variables
 ```bash
@@ -288,14 +312,3 @@ LOG_LEVEL=INFO
 - **Fine-tuning**: ~$50-100 initial cost, 2-3 days development
 - **Break-even**: ~1000 predictions/month
 
-
-## Contributing
-
-This is a take-home project, but the framework is designed for extensibility:
-
-1. **Add new models**: Inherit from `BasePIIModel`
-2. **Extend evaluation**: Modify `PIIEvaluator` for new metrics
-3. **New datasets**: Extend `PIIDataLoader` for different formats
-
-
-**Ready for Production Deployment!**
