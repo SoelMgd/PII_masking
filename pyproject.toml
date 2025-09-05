@@ -5,9 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pii-masking"
 version = "0.1.0"
-description = "PII Masking Evaluation Framework for Mistral AI Take-Home"
+description = "PII Masking Evaluation Framework"
 authors = [
-    {name = "Applied AI Engineer Candidate", email = "candidate@example.com"}
+    {name = "SoelMgd"}
 ]
 readme = "README.md"
 requires-python = ">=3.9"
@@ -53,8 +53,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/candidate/pii-masking"
-Repository = "https://github.com/candidate/pii-masking"
+Homepage = "https://github.com/SoelMgd/pii-masking"
+Repository = "https://github.com/SoelMgd/pii-masking"
 
 [project.scripts]
 pii-evaluate = "pii_masking.cli:main"
