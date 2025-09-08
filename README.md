@@ -91,7 +91,6 @@ cd experiments
 uv run mistral_baseline.py --samples 500 --few-shot --output ../results/mistral_baseline_full.json
 ```
 
-
 ## Evaluation Methodology
 
 ### Strict Position Matching 
@@ -108,7 +107,7 @@ All experiments return `EvaluationResult` objects with:
 ## Available Experiments
 
 ### 1. Mistral API Prompting (`mistral_prompting_baseline.py`)
-- **Approach**: Sophisticated prompt engineering + few-shot learning
+- **Approach**: Prompt engineering + few-shot learning
 - **Models**: mistral-large-latest, fine-tuned models
 - **Features**: Rate limiting, retry logic, batch processing, configurable prompts
 - **Languages**: English & french
@@ -159,7 +158,6 @@ uv run eval.py \
 ### 5. Cross-Method Evaluation (`evaluation_comparison.py`)
 - **Comprehensive comparison** across all three approaches
 - **Performance metrics**: Precision, Recall, F1-Score by entity type
-- **Cost analysis**: API costs vs. fine-tuning investment
 
 ### 6. Performance Benchmarks (`performance_benchmarks/`)
 - **Speed benchmarking**: Inference time & throughput testing across different text lengths
@@ -173,7 +171,6 @@ python speed_benchmark.py
 python concurrency_benchmark.py 
 ```
 
-
 ## Production Deployment (HuggingFace Space)
 
 The `space/` directory contains a complete production-ready web application deployed on HuggingFace Spaces.
@@ -186,15 +183,6 @@ The `space/` directory contains a complete production-ready web application depl
 - **Concurrent processing**: Multiple users served simultaneously without blocking
 - **Optimized inference**: CPU-optimized BERT, batched Mistral API calls
 - **Modern UI**: Responsive interface with real-time feedback
-
-### Quick Deploy
-```bash
-cd space
-uv sync
-uv run app.py
-# Visit http://localhost:7860
-```
-
 
 ### Architecture
 - **Backend**: FastAPI with smart async/sync processing architecture
@@ -263,7 +251,6 @@ LOG_LEVEL=INFO
     "precision": 0.847,
     "recall": 0.793,
     "f1_score": 0.819,
-    "exact_match_accuracy": 0.340
   },
   "per_class_metrics": {
     "FIRSTNAME": {"precision": 0.95, "recall": 0.92, "f1_score": 0.93},
