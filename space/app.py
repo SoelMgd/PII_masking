@@ -6,6 +6,7 @@ FastAPI application for PII Masking Demo - HuggingFace Space.
 import os
 import time
 import logging
+import json
 from contextlib import asynccontextmanager
 from typing import Dict, Any, List
 
@@ -135,69 +136,7 @@ async def root():
     try:
         return FileResponse("static/index.html")
     except Exception:
-        return HTMLResponse("""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>PII Masking Demo</title>
-            <style>
-                body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-                .container { background: #f5f5f5; padding: 20px; border-radius: 10px; }
-                textarea { width: 100%; height: 100px; margin: 10px 0; padding: 10px; }
-                button { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-                .result { margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 5px; }
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <h1>🔒 PII Masking Demo</h1>
-                <p>Enter text below to detect and mask Personal Identifiable Information:</p>
-                
-                <textarea id="inputText" placeholder="Enter your text here... (e.g., Hi, my name is John Smith and my email is john.smith@company.com)"></textarea>
-                <br>
-                <button onclick="processText()">Process Text</button>
-                
-                <div id="result" class="result" style="display:none;">
-                    <h3>Results:</h3>
-                    <p><strong>Masked Text:</strong> <span id="maskedText"></span></p>
-                    <p><strong>Entities Found:</strong> <span id="entities"></span></p>
-                    <p><strong>Processing Time:</strong> <span id="processingTime"></span>s</p>
-                </div>
-            </div>
-            
-            <script>
-                async function processText() {
-                    const text = document.getElementById('inputText').value;
-                    if (!text.trim()) {
-                        alert('Please enter some text');
-                        return;
-                    }
-                    
-                    try {
-                        const response = await fetch('/predict', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ text: text, method: 'mistral' })
-                        });
-                        
-                        const result = await response.json();
-                        
-                        if (response.ok) {
-                            document.getElementById('maskedText').textContent = result.masked_text;
-                            document.getElementById('entities').textContent = JSON.stringify(result.entities, null, 2);
-                            document.getElementById('processingTime').textContent = result.processing_time.toFixed(3);
-                            document.getElementById('result').style.display = 'block';
-                        } else {
-                            alert('Error: ' + result.detail);
-                        }
-                    } catch (error) {
-                        alert('Error: ' + error.message);
-                    }
-                }
-            </script>
-        </body>
-        </html>
-        """)
+        raise HTTPException(status_code=500, detail=f"Error loading index.html")
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
@@ -279,7 +218,6 @@ async def predict_pdf(
         )
     
     try:
-        import json
         pii_entities_list = json.loads(pii_entities) if pii_entities else []
         
         start_time = time.time()

@@ -8,22 +8,10 @@ import logging
 from dataclasses import dataclass
 
 from .data_loader import PIIExample
-from .text_processing import PIIPrediction, reconstruct_masked_text_from_prediction as _reconstruct
+from .text_processing import PIIPrediction
 
 logger = logging.getLogger(__name__)
 
-def reconstruct_masked_text_from_prediction(text: str, prediction: Union[str, PIIPrediction]) -> str:
-    """
-    Reconstruct masked text from a prediction.
-    
-    Args:
-        text: Original unmasked text
-        prediction: Either a JSON string or PIIPrediction object
-        
-    Returns:
-        Text with PII replaced by [ENTITY_TYPE_X] placeholders
-    """
-    return _reconstruct(text, prediction)
 
 class BasePIIModel(ABC):
     """

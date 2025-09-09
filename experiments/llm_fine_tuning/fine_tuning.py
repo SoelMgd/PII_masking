@@ -21,7 +21,6 @@ from typing import Dict, Any, Optional
 from mistralai import Mistral
 from dotenv import load_dotenv
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -85,7 +84,6 @@ class MistralFineTuner:
         Returns:
             Job ID
         """
-        # Default hyperparameters
         if hyperparameters is None:
             hyperparameters = {
                 "training_steps": 100,
@@ -95,7 +93,6 @@ class MistralFineTuner:
         logger.info(f"Creating fine-tuning job for model: {model}")
         logger.info(f"Hyperparameters: {hyperparameters}")
         
-        # Create job
         job_params = {
             "model": model,
             "training_files": [{"file_id": training_file_id, "weight": 1}],
@@ -181,7 +178,6 @@ class MistralFineTuner:
                 
                 return job_info
             
-            # Log additional info if available
             if job_info.get("trained_tokens"):
                 logger.info(f"Trained tokens: {job_info['trained_tokens']}")
             if job_info.get("epochs"):
@@ -281,7 +277,6 @@ def main():
     
     args = parser.parse_args()
     
-    # Load environment variables
     load_dotenv()
     api_key = os.getenv("MISTRAL_API_KEY")
     
@@ -289,11 +284,9 @@ def main():
         logger.error("MISTRAL_API_KEY environment variable not set")
         return
     
-    # Initialize fine-tuner
     fine_tuner = MistralFineTuner(api_key)
     
     try:
-        # Handle different operations
         if args.list_jobs:
             logger.info("Listing recent fine-tuning jobs...")
             jobs = fine_tuner.list_jobs()
@@ -332,7 +325,6 @@ def main():
             return
         
         if args.job_id and args.monitor:
-            # Monitor existing job
             final_job = fine_tuner.monitor_job(args.job_id)
             print(f"\nJob completed!")
             print(f"Status: {final_job['status']}")
@@ -340,7 +332,6 @@ def main():
                 print(f"Fine-tuned Model: {final_job['fine_tuned_model']}")
             return
         
-        # Create new fine-tuning job
         train_file = Path(args.train_file)
         val_file = Path(args.val_file)
         
@@ -352,18 +343,15 @@ def main():
             logger.error(f"Validation file not found: {val_file}")
             return
         
-        # Upload files
         logger.info("Uploading training and validation files...")
         train_file_id = fine_tuner.upload_file(train_file, "pii_train.jsonl")
         val_file_id = fine_tuner.upload_file(val_file, "pii_validation.jsonl")
         
-        # Set hyperparameters
         hyperparameters = {
             "training_steps": args.training_steps,
             "learning_rate": args.learning_rate
         }
         
-        # Create job
         job_id = fine_tuner.create_fine_tuning_job(
             model=args.model,
             training_file_id=train_file_id,
@@ -380,18 +368,18 @@ def main():
         print(f"Learning rate: {args.learning_rate}")
         
         if not args.auto_start:
-            print(f"\n⚠️  Job created but not started. To start:")
+            print(f"\nJob created but not started. To start:")
             print(f"python fine_tuning.py --start-job --job-id {job_id}")
             
             if args.monitor:
-                print(f"\n🔍 To monitor progress:")
+                print(f"\nTo monitor progress:")
                 print(f"python fine_tuning.py --monitor --job-id {job_id}")
         else:
-            print(f"\n🚀 Job started automatically!")
+            print(f"\nJob started automatically!")
             
             if args.monitor:
                 final_job = fine_tuner.monitor_job(job_id)
-                print(f"\n🎉 Job completed!")
+                print(f"\nJob completed!")
                 print(f"Status: {final_job['status']}")
                 if final_job['fine_tuned_model']:
                     print(f"Fine-tuned Model: {final_job['fine_tuned_model']}")
