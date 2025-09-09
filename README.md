@@ -163,14 +163,6 @@ uv run eval.py \
 - **Speed benchmarking**: Inference time & throughput testing across different text lengths
 - **Concurrency validation**: Sequential vs concurrent processing comparison
 
-```bash
-cd experiments/performance_benchmarks
-
-# Run comprehensive performance benchmarks
-python speed_benchmark.py
-python concurrency_benchmark.py 
-```
-
 ## Production Deployment (HuggingFace Space)
 
 The `space/` directory contains a complete production-ready web application deployed on HuggingFace Spaces.
